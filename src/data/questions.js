@@ -70,7 +70,7 @@ export const QUESTIONS = [
     id: 'DA-2',
     dimension: 'DA',
     polarity: -1,
-    text: '情绪顶上来时，我们更容易先停一下，等缓和后再聊。',
+    text: '情绪上来时，我们通常会先暂停沟通，哪怕这会让问题晚点再谈。',
   },
   {
     id: 'SI-2',
@@ -88,7 +88,7 @@ export const QUESTIONS = [
     id: 'RP-2',
     dimension: 'RP',
     polarity: -1,
-    text: '比起准备浪漫桥段，我们更常用把事办妥来表达在意。',
+    text: '比起专门制造惊喜，我们更常通过把日常事务做好来表达在意。',
   },
 
   // 9-16
@@ -96,7 +96,7 @@ export const QUESTIONS = [
     id: 'OF-3',
     dimension: 'OF',
     polarity: 1,
-    text: '涉及共同花销时，我们会先对预算有个基本共识。',
+    text: '如果共同花销没先定预算，我们会明显不安。',
   },
   {
     id: 'RP-3',
@@ -108,7 +108,7 @@ export const QUESTIONS = [
     id: 'SI-3',
     dimension: 'SI',
     polarity: 1,
-    text: '分开几天时，我们会主动找时间保持联系。',
+    text: '分开几天时，我们通常会主动抽时间通话或认真聊近况。',
   },
   {
     id: 'DA-3',
@@ -120,7 +120,7 @@ export const QUESTIONS = [
     id: 'RP-4',
     dimension: 'RP',
     polarity: -1,
-    text: '比起惊喜感，我们更看重日常里的稳定配合。',
+    text: '当一方状态很差时，我们更常先帮对方把现实问题处理好。',
   },
   {
     id: 'OF-4',
@@ -138,7 +138,7 @@ export const QUESTIONS = [
     id: 'SI-4',
     dimension: 'SI',
     polarity: -1,
-    text: '在同一个空间里，我们可以长时间各做各的也不别扭。',
+    text: '在同一个空间里，我们长时间各做各的也不会觉得疏远。',
   },
 
   // 17-24
@@ -146,7 +146,7 @@ export const QUESTIONS = [
     id: 'SI-5',
     dimension: 'SI',
     polarity: 1,
-    text: '工作日结束后，我们通常会想把晚上的一段时间留给彼此。',
+    text: '工作日结束后，我们通常会优先把一段固定时间留给彼此。',
   },
   {
     id: 'DA-5',
@@ -158,7 +158,7 @@ export const QUESTIONS = [
     id: 'OF-5',
     dimension: 'OF',
     polarity: 1,
-    text: '提前约好的行程，我们一般会按原计划执行。',
+    text: '提前约好的行程一旦被临时改动，我们通常会不太舒服。',
   },
   {
     id: 'RP-5',
@@ -170,25 +170,25 @@ export const QUESTIONS = [
     id: 'RP-6',
     dimension: 'RP',
     polarity: -1,
-    text: '和花心思制造氛围相比，我们更在意彼此是否把生活照顾好。',
+    text: '送礼或表达心意时，我们更看重实用度，而不是惊喜感。',
   },
   {
     id: 'SI-6',
     dimension: 'SI',
     polarity: -1,
-    text: '就算一阵子互动少一点，我们也能先顾好各自节奏。',
+    text: '就算在同城，我们也不太需要随时报备彼此行程。',
   },
   {
     id: 'DA-6',
     dimension: 'DA',
     polarity: -1,
-    text: '对方在气头上时，我们多半会先给空间，不急着追问。',
+    text: '对方在气头上时，我们更倾向先留空间，而不是当下追问。',
   },
   {
     id: 'OF-6',
     dimension: 'OF',
     polarity: -1,
-    text: '我们更像边走边看，很少把每周都排得特别满。',
+    text: '下班后临时冒出新安排时，我们通常也能快速切换。',
   },
 
   // 25-32
@@ -196,43 +196,43 @@ export const QUESTIONS = [
     id: 'OF-7',
     dimension: 'OF',
     polarity: 1,
-    text: '遇到搬家、换工作这类大决定时，我们会先把关键信息梳理清楚。',
+    text: '在搬家、换工作这类大决定上，不先把信息梳理清楚我们很难推进。',
   },
   {
     id: 'DA-7',
     dimension: 'DA',
     polarity: 1,
-    text: '一些不太好聊的话题，我们通常也会找机会正面谈。',
+    text: '即使是容易尴尬的话题，我们也会主动约一个时间聊清楚。',
   },
   {
     id: 'RP-7',
     dimension: 'RP',
     polarity: 1,
-    text: '一起出行时，我们会有意识地留下一些“属于我们”的记忆。',
+    text: '一起出行时，我们会刻意安排一些“只属于我们”的时刻。',
   },
   {
     id: 'SI-7',
     dimension: 'SI',
     polarity: 1,
-    text: '日常的小事（买菜、办事、散步）我们常会想一起去做。',
+    text: '涉及双方的社交场合（朋友局/家庭局），我们更倾向一起出现。',
   },
   {
     id: 'DA-8',
     dimension: 'DA',
     polarity: -1,
-    text: '有些冲突我们会先隔一段时间再谈，效果反而更好。',
+    text: '有些冲突我们会先隔一段时间再谈，这样通常比当场谈更有效。',
   },
   {
     id: 'OF-8',
     dimension: 'OF',
     polarity: -1,
-    text: '没有明确周计划时，我们反而更容易放松下来。',
+    text: '旅行时我们更愿意到了再决定吃住行，而不是提前排满。',
   },
   {
     id: 'SI-8',
     dimension: 'SI',
     polarity: -1,
-    text: '即使见面频率下降，我们也能先把各自生活过稳。',
+    text: '见面频率下降时，我们通常不会立刻担心亲密感变淡。',
   },
   {
     id: 'RP-8',
