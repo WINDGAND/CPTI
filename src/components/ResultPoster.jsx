@@ -13,7 +13,8 @@ import {
 import { DIMENSION_DETAILS, getResultByCode } from '../utils/scoring'
 import { createDualInviteLink } from '../utils/inviteCodec'
 import { QUESTIONS } from '../data/questions'
-import { getTypeImageSrc } from '../data/typeImages'
+import { getTypeImageSources } from '../data/typeImages'
+import { recordImageMetric } from '../utils/imageMetrics'
 
 /**
  * ResultPoster — 多分节深度报告页（8 个分区）
@@ -91,29 +92,75 @@ function renderSpectrum(percentages) {
 }
 
 function ResultHeroIllustration({ code }) {
+  const [src, setSrc] = useState(() => getTypeImageSources(code).webp)
+  const [loaded, setLoaded] = useState(false)
+  const [fallbackTried, setFallbackTried] = useState(false)
   const [broken, setBroken] = useState(false)
-  const src = getTypeImageSrc(code)
+  const startTsRef = useRef(performance.now())
+
+  useEffect(() => {
+    const { webp } = getTypeImageSources(code)
+    setSrc(webp)
+    setLoaded(false)
+    setFallbackTried(false)
+    setBroken(false)
+    startTsRef.current = performance.now()
+  }, [code])
+
+  function handleLoad() {
+    setLoaded(true)
+    recordImageMetric({
+      page: 'result',
+      code,
+      status: fallbackTried ? 'fallback-success' : 'success',
+      durationMs: Math.round(performance.now() - startTsRef.current),
+      src,
+    })
+  }
+
+  function handleError() {
+    if (!fallbackTried) {
+      setFallbackTried(true)
+      setSrc(getTypeImageSources(code).png)
+      return
+    }
+    setBroken(true)
+    setLoaded(true)
+    recordImageMetric({
+      page: 'result',
+      code,
+      status: 'failed',
+      durationMs: Math.round(performance.now() - startTsRef.current),
+      src,
+    })
+  }
 
   if (broken) {
     return (
       <div
-        className="w-full max-w-[280px] lg:max-w-[340px] aspect-[4/5] rounded-2xl border-2 border-dashed border-white/35 bg-white/10 flex items-center justify-center mx-auto lg:mx-0"
+        className="w-full max-w-[280px] lg:max-w-[340px] aspect-[4/5] rounded-2xl border border-white/20 bg-white/10 flex items-center justify-center mx-auto lg:mx-0"
         aria-hidden
       >
-        <span className="text-xs font-medium text-white/50 px-3 text-center">配图待定</span>
+        <div className="h-12 w-12 rounded-xl bg-white/20" />
       </div>
     )
   }
 
   return (
-    <div className="w-full max-w-[280px] lg:max-w-[340px] aspect-[4/5] mx-auto lg:mx-0 rounded-2xl overflow-hidden shadow-xl ring-2 ring-white/20 bg-white/10">
+    <div className="relative w-full max-w-[280px] lg:max-w-[340px] aspect-[4/5] mx-auto lg:mx-0 rounded-2xl overflow-hidden shadow-xl ring-2 ring-white/20 bg-white/10">
+      {!loaded && (
+        <div className="absolute inset-0 animate-pulse bg-white/20" aria-hidden />
+      )}
       <img
         src={src}
         alt=""
         className="h-full w-full object-cover object-center"
+        style={{ opacity: loaded ? 1 : 0 }}
         loading="eager"
+        fetchPriority="high"
         decoding="async"
-        onError={() => setBroken(true)}
+        onLoad={handleLoad}
+        onError={handleError}
       />
     </div>
   )

@@ -1,17 +1,19 @@
-import { useState } from 'react'
+import { Suspense, lazy, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import AppShell from './components/layout/AppShell'
 import HomeStepCards from './components/home/HomeStepCards'
 import Questionnaire from './components/Questionnaire'
 import Loading from './components/Loading'
-import ResultPoster from './components/ResultPoster'
-import CoupleTypesPage from './components/types/CoupleTypesPage'
 import FAQPage from './components/faq/FAQPage'
 import AboutPage from './components/about/AboutPage'
 import StatsPage from './components/stats/StatsPage'
 import { QUESTIONS, QUESTIONS_PER_DIMENSION } from './data/questions'
 import { computeDualModeResult, computeSingleModeResult } from './utils/scoring'
 import { submitStats } from './utils/statsApi'
+import { preloadTypeImage } from './data/typeImages'
+
+const ResultPoster = lazy(() => import('./components/ResultPoster'))
+const CoupleTypesPage = lazy(() => import('./components/types/CoupleTypesPage'))
 
 /**
  * App — 顶层视图路由
@@ -32,6 +34,10 @@ export default function App() {
   const [view, setView] = useState('home')
   const [mainTab, setMainTab] = useState('quiz')
   const [resultData, setResultData] = useState(null)
+  const [loadingMeta, setLoadingMeta] = useState({
+    preloadTask: Promise.resolve(),
+    minDurationMs: 800,
+  })
 
   function goQuizHome() {
     setResultData(null)
@@ -89,7 +95,15 @@ export default function App() {
       submitStats(resultCode, payload.mode).catch(() => {})
     }
 
+    const preloadTask = resultCode
+      ? preloadTypeImage(resultCode)
+      : Promise.resolve()
+
     setResultData(computed)
+    setLoadingMeta({
+      preloadTask,
+      minDurationMs: 800,
+    })
     setView('loading')
     window.scrollTo({ top: 0, behavior: 'instant' })
   }
@@ -106,7 +120,13 @@ export default function App() {
 
   // ── Loading ────────────────────────────────────────────────
   if (view === 'loading') {
-    return <Loading onDone={handleLoadingDone} />
+    return (
+      <Loading
+        onDone={handleLoadingDone}
+        minDurationMs={loadingMeta.minDurationMs}
+        preloadTask={loadingMeta.preloadTask}
+      />
+    )
   }
 
   // ── 结果海报 ───────────────────────────────────────────────
@@ -121,10 +141,12 @@ export default function App() {
             exit={{    opacity: 0, y: -16 }}
             transition={{ duration: 0.4 }}
           >
-            <ResultPoster
-              resultData={resultData}
-              onRestart={handleRestart}
-            />
+            <Suspense fallback={<div className="py-16 text-center text-base-mute">正在准备报告内容...</div>}>
+              <ResultPoster
+                resultData={resultData}
+                onRestart={handleRestart}
+              />
+            </Suspense>
           </motion.div>
         </AnimatePresence>
       </AppShell>
@@ -138,7 +160,9 @@ export default function App() {
       contentSurface={mainTab === 'types' ? 'white' : 'muted'}
     >
       {mainTab === 'types' ? (
-        <CoupleTypesPage onStartTest={goQuizHome} />
+        <Suspense fallback={<div className="py-12 text-center text-base-mute">正在加载情侣类型...</div>}>
+          <CoupleTypesPage onStartTest={goQuizHome} />
+        </Suspense>
       ) : mainTab === 'stats' ? (
         <StatsPage
           onStartTest={goQuizHome}

@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { RESULTS } from '../../data/results'
 import { TYPE_GROUP_META, TYPE_GROUP_ORDER } from '../../data/typeGroups'
 import { getTypeListingIntro } from '../../utils/typeListing'
-import { getTypeImageSrc } from '../../data/typeImages'
+import { getTypeImageSources } from '../../data/typeImages'
+import { recordImageMetric } from '../../utils/imageMetrics'
 
 function StartTestButton({ onClick }) {
   return (
@@ -18,32 +19,77 @@ function StartTestButton({ onClick }) {
   )
 }
 
-function TypeIllustration({ code }) {
+function TypeIllustration({ code, priority = false }) {
+  const sources = getTypeImageSources(code)
+  const [src, setSrc] = useState(sources.webp)
+  const [loaded, setLoaded] = useState(false)
+  const [fallbackTried, setFallbackTried] = useState(false)
   const [broken, setBroken] = useState(false)
-  const src = getTypeImageSrc(code)
+  const startTsRef = useRef(performance.now())
+
+  useEffect(() => {
+    const next = getTypeImageSources(code)
+    setSrc(next.webp)
+    setLoaded(false)
+    setFallbackTried(false)
+    setBroken(false)
+    startTsRef.current = performance.now()
+  }, [code])
+
+  function handleLoad() {
+    setLoaded(true)
+    recordImageMetric({
+      page: 'types',
+      code,
+      status: fallbackTried ? 'fallback-success' : 'success',
+      durationMs: Math.round(performance.now() - startTsRef.current),
+      src,
+    })
+  }
+
+  function handleError() {
+    if (!fallbackTried) {
+      setFallbackTried(true)
+      setSrc(getTypeImageSources(code).png)
+      return
+    }
+    setLoaded(true)
+    setBroken(true)
+    recordImageMetric({
+      page: 'types',
+      code,
+      status: 'failed',
+      durationMs: Math.round(performance.now() - startTsRef.current),
+      src,
+    })
+  }
 
   if (broken) {
     return (
       <div
-        className="w-full max-w-[220px] aspect-[4/5] rounded-xl border-2 border-dashed border-base-text/15 bg-white/30 flex items-center justify-center mb-4 mx-auto"
+        className="w-full max-w-[220px] aspect-[4/5] rounded-xl border border-base-text/10 bg-white/30 flex items-center justify-center mb-4 mx-auto"
         aria-label={`${code} 配图占位`}
       >
-        <span className="text-xs font-medium text-base-mute/60 px-3 text-center">
-          配图待定
-        </span>
+        <div className="h-10 w-10 rounded-lg bg-base-text/10" />
       </div>
     )
   }
 
   return (
-    <div className="w-full max-w-[220px] aspect-[4/5] mx-auto mb-4 rounded-xl overflow-hidden bg-white/25 shadow-sm ring-1 ring-black/[0.04]">
+    <div className="relative w-full max-w-[220px] aspect-[4/5] mx-auto mb-4 rounded-xl overflow-hidden bg-white/25 shadow-sm ring-1 ring-black/[0.04]">
+      {!loaded && (
+        <div className="absolute inset-0 animate-pulse bg-white/50" aria-hidden />
+      )}
       <img
         src={src}
         alt=""
         className="h-full w-full object-cover object-center"
-        loading="lazy"
+        style={{ opacity: loaded ? 1 : 0 }}
+        loading={priority ? 'eager' : 'lazy'}
+        fetchPriority={priority ? 'high' : 'auto'}
         decoding="async"
-        onError={() => setBroken(true)}
+        onLoad={handleLoad}
+        onError={handleError}
       />
     </div>
   )
@@ -93,6 +139,8 @@ export default function CoupleTypesPage({ onStartTest }) {
               style={{
                 zIndex: index + 1,
                 backgroundColor: `color-mix(in srgb, ${meta.accent} 18%, white)`,
+                contentVisibility: index === 0 ? 'visible' : 'auto',
+                containIntrinsicSize: index === 0 ? undefined : '900px',
               }}
               aria-label={`${meta.label} ${meta.subtitle}`}
             >
@@ -112,12 +160,15 @@ export default function CoupleTypesPage({ onStartTest }) {
                 </p>
 
                 <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 sm:gap-x-10 sm:gap-y-10 lg:gap-x-12 xl:gap-x-16 lg:gap-y-8">
-                  {types.map((type) => (
+                  {types.map((type, itemIdx) => (
                     <article
                       key={type.code}
                       className="flex flex-col items-center text-center lg:min-w-0 lg:px-1 xl:px-2"
                     >
-                      <TypeIllustration code={type.code} />
+                      <TypeIllustration
+                        code={type.code}
+                        priority={index === 0 && itemIdx < 4}
+                      />
                       <h3
                         className="text-lg font-bold leading-snug text-center"
                         style={{ color: meta.accent }}

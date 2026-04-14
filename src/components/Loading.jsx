@@ -4,9 +4,11 @@ import { motion } from 'framer-motion'
 /**
  * Loading — 光谱融合过渡页（PRD 3.2.2）
  *
- * 全屏居中光谱动画，2 秒后自动调用 onDone()。
+ * 全屏居中光谱动画，达到最短展示时长且关键资源就绪后自动进入结果页。
  * Props:
- *   onDone() — 2s 后跳转结果页的回调
+ *   onDone() — 过渡结束后跳转结果页的回调
+ *   minDurationMs — 最短展示时长
+ *   preloadTask — 关键资源预热 Promise
  */
 
 // 四大色系对应的圆点颜色（与 tailwind.config 一致）
@@ -22,11 +24,29 @@ const ORBIT_ANGLES = [0, 90, 180, 270]
 const ORBIT_RX = 44  // 水平半轴 px
 const ORBIT_RY = 28  // 垂直半轴 px
 
-export default function Loading({ onDone }) {
+export default function Loading({
+  onDone,
+  minDurationMs = 800,
+  preloadTask = Promise.resolve(),
+}) {
   useEffect(() => {
-    const t = setTimeout(() => onDone(), 2000)
-    return () => clearTimeout(t)
-  }, [onDone])
+    let cancelled = false
+    let minTimer = null
+    const minWait = new Promise((resolve) => {
+      const waitMs = Math.max(0, minDurationMs)
+      minTimer = setTimeout(resolve, waitMs)
+    })
+
+    Promise.allSettled([minWait, preloadTask])
+      .then(() => {
+        if (!cancelled) onDone()
+      })
+
+    return () => {
+      cancelled = true
+      if (minTimer) clearTimeout(minTimer)
+    }
+  }, [onDone, minDurationMs, preloadTask])
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-base-bg">

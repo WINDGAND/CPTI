@@ -280,6 +280,17 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 - API 路由部署异常或返回非 200
 - Cloudflare 下未生效 `functions/api/*` 路由
 
+## 图片性能验收阈值
+
+针对结果页与情侣类型页，建议按以下阈值做灰度验收（弱网 4G + 中端机）：
+
+- 结果页主图可见时间：`P75 <= 1.8s`，`P95 <= 2.5s`
+- 情侣类型页首屏 4 张图可见时间：`P75 <= 1.2s`，`P95 <= 1.8s`
+- 图片加载失败率：`< 0.5%`
+- WebP 命中率：`>= 95%`
+
+前端已内置轻量级图片指标采集（`src/utils/imageMetrics.js`），会按页面记录 `success / fallback-success / failed` 与加载耗时，可用于灰度期抽样评估。
+
 ### Q2：如何新增或修改题目？
 
 编辑 `src/data/questions.js`，保持：
