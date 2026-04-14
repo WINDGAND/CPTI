@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { ArrowRight, Sparkles, TrendingDown, TrendingUp } from 'lucide-react'
-import { STATS_DATA } from '../../data/stats'
 import { fetchStatsSummary } from '../../utils/statsApi'
 
 const TYPE_COLORS = [
@@ -10,6 +9,36 @@ const TYPE_COLORS = [
   '#277DA1', '#577590', '#7B2CBF', '#9D4EDD',
   '#C77DFF', '#F15BB5', '#00BBF9', '#00F5D4',
 ]
+
+const PLACEHOLDER_RANKED = Array.from({ length: 8 }, (_, index) => ({
+  code: '--',
+  title: '--',
+  percent: 0,
+  count: 0,
+  key: `placeholder-ranked-${index}`,
+}))
+
+const PLACEHOLDER_GROUPS = Array.from({ length: 4 }, (_, index) => ({
+  group: `g-${index}`,
+  label: '--',
+  percent: 0,
+  count: 0,
+  accent: '#E5E7EB',
+}))
+
+const PLACEHOLDER_TOP_BOTTOM = Array.from({ length: 3 }, (_, index) => ({
+  code: '--',
+  title: '--',
+  percent: 0,
+  key: `placeholder-top-bottom-${index}`,
+}))
+
+const PLACEHOLDER_INSIGHTS = Array.from({ length: 3 }, (_, index) => ({
+  title: '--',
+  value: '--',
+  note: '--',
+  key: `placeholder-insight-${index}`,
+}))
 
 function formatNumber(value) {
   return new Intl.NumberFormat('zh-CN').format(value)
@@ -88,40 +117,51 @@ function createDonutSlicePath(cx, cy, outerR, innerR, startDeg, endDeg) {
 }
 
 export default function StatsPage({ onStartTest, onGoTypes }) {
-  const [statsData, setStatsData] = useState(STATS_DATA)
-  const [statsSource, setStatsSource] = useState('fallback')
+  const [statsData, setStatsData] = useState(null)
+  const [requestState, setRequestState] = useState('loading')
   const [statsError, setStatsError] = useState('')
   const [metricMode, setMetricMode] = useState('percent')
-  const [activeCode, setActiveCode] = useState(STATS_DATA.typeDistribution[0]?.code ?? null)
+  const [activeCode, setActiveCode] = useState(null)
+  const [retryCount, setRetryCount] = useState(0)
+
+  const isLoading = requestState === 'loading'
+  const hasData = requestState === 'success' && !!statsData?.typeDistribution?.length
+  const isError = requestState === 'error'
 
   useEffect(() => {
     let disposed = false
 
     async function loadRemoteStats() {
+      setRequestState('loading')
       try {
         const remote = await fetchStatsSummary()
         if (disposed || !remote?.typeDistribution?.length) return
         setStatsData(remote)
-        setStatsSource('live')
+        setActiveCode(remote.typeDistribution[0]?.code ?? null)
+        setRequestState('success')
         setStatsError('')
       } catch {
         if (disposed) return
-        setStatsSource('fallback')
-        setStatsError('当前展示为本地演示数据，稍后将自动重试在线统计。')
+        setStatsData(null)
+        setActiveCode(null)
+        setRequestState('error')
+        setStatsError('获取统计数据失败，请稍后刷新重试。')
       }
     }
 
     loadRemoteStats()
     return () => { disposed = true }
-  }, [])
+  }, [retryCount])
 
   const typeColorMap = useMemo(() => {
+    if (!hasData) return {}
     return Object.fromEntries(
       statsData.typeDistribution.map((item, idx) => [item.code, TYPE_COLORS[idx % TYPE_COLORS.length]])
     )
-  }, [statsData.typeDistribution])
+  }, [hasData, statsData])
 
   const donutSlices = useMemo(() => {
+    if (!hasData) return []
     let currentAngle = 0
     return statsData.typeDistribution.map((item) => {
       const span = (item.percent / 100) * 360
@@ -135,27 +175,31 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
         color: typeColorMap[item.code],
       }
     })
-  }, [statsData.typeDistribution, typeColorMap])
+  }, [hasData, statsData, typeColorMap])
 
   const activeType = useMemo(() => {
+    if (!hasData) {
+      return { code: '--', title: '--', percent: 0, count: 0 }
+    }
     return statsData.typeDistribution.find((item) => item.code === activeCode) ?? statsData.typeDistribution[0]
-  }, [activeCode, statsData.typeDistribution])
+  }, [activeCode, hasData, statsData])
 
   const rankedTypes = useMemo(() => {
+    if (!hasData) return PLACEHOLDER_RANKED
     const list = [...statsData.typeDistribution]
     if (metricMode === 'count') {
       return list.sort((a, b) => b.count - a.count)
     }
     return list.sort((a, b) => b.percent - a.percent)
-  }, [metricMode, statsData.typeDistribution])
+  }, [hasData, metricMode, statsData])
 
   useEffect(() => {
-    if (!statsData.typeDistribution.length) return
+    if (!hasData) return
     const exists = statsData.typeDistribution.some((item) => item.code === activeCode)
     if (!exists) {
       setActiveCode(statsData.typeDistribution[0].code)
     }
-  }, [activeCode, statsData.typeDistribution])
+  }, [activeCode, hasData, statsData])
 
   return (
     <div className="pb-10">
@@ -171,29 +215,59 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
         <div className="mt-6 rounded-card border border-brand-cyan/15 bg-brand-cyan/5 px-4 py-4 max-w-xl mx-auto shadow-card">
           <p className="text-xs text-brand-cyan font-semibold tracking-wide">累计问卷份数</p>
           <p className="mt-1 text-3xl md:text-4xl font-black text-base-text">
-            <CountUpNumber target={statsData.totalSubmissions} />
+            {isLoading ? (
+              <span className="inline-block h-10 w-28 rounded bg-gray-200 animate-pulse" />
+            ) : hasData ? (
+              <CountUpNumber target={statsData.totalSubmissions} />
+            ) : (
+              '--'
+            )}
           </p>
           <p className="mt-1 text-xs text-base-mute">
-            数据更新时间：{statsData.lastUpdated} · {statsData.sourceNote}
+            数据更新时间：{hasData ? statsData.lastUpdated : '--'} · {hasData ? statsData.sourceNote : '--'}
           </p>
-          {statsError && (
-            <p className="mt-1 text-xs text-amber-600">{statsError}</p>
+          {isError && statsError && (
+            <div className="mt-2 flex flex-col items-center gap-2">
+              <p className="text-xs text-amber-600">{statsError}</p>
+              <button
+                type="button"
+                className="rounded-full border border-brand-cyan/30 bg-white px-3 py-1 text-xs font-semibold text-brand-cyan transition hover:bg-brand-cyan hover:text-white"
+                onClick={() => setRetryCount((count) => count + 1)}
+              >
+                重试获取数据
+              </button>
+            </div>
           )}
         </div>
 
         <div className="mt-4 flex flex-wrap justify-center gap-2">
-          {statsData.cuteTags.map((tag) => (
-            <span
-              key={tag}
-              className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-white px-3 py-1 text-xs text-base-mute"
-            >
-              <Sparkles size={12} className="text-brand-cyan" aria-hidden />
-              {tag}
+          {isLoading ? (
+            Array.from({ length: 5 }, (_, index) => (
+              <span
+                key={`tag-skeleton-${index}`}
+                className="inline-block h-7 w-24 rounded-full bg-gray-200 animate-pulse"
+              />
+            ))
+          ) : hasData ? (
+            <>
+              {statsData.cuteTags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-white px-3 py-1 text-xs text-base-mute"
+                >
+                  <Sparkles size={12} className="text-brand-cyan" aria-hidden />
+                  {tag}
+                </span>
+              ))}
+              <span className="inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-1 text-xs text-base-mute">
+                在线共享数据
+              </span>
+            </>
+          ) : (
+            <span className="inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-1 text-xs text-base-mute">
+              --
             </span>
-          ))}
-          <span className="inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-1 text-xs text-base-mute">
-            {statsSource === 'live' ? '在线共享数据' : '演示回退数据'}
-          </span>
+          )}
         </div>
       </header>
 
@@ -226,40 +300,46 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
 
         <div className="mt-4 space-y-4">
           <div className="mx-auto max-w-[280px]">
-            <motion.div
-              className="relative mx-auto h-[220px] w-[220px] sm:h-[240px] sm:w-[240px]"
-              initial={{ rotate: -15, opacity: 0.4 }}
-              animate={{ rotate: 0, opacity: 1 }}
-              transition={{ duration: 0.7, ease: 'easeOut' }}
-            >
-              <svg viewBox="0 0 240 240" className="h-full w-full">
-                {donutSlices.map((slice) => {
-                  const isActive = activeType?.code === slice.code
-                  const path = createDonutSlicePath(120, 120, isActive ? 108 : 104, 62, slice.startAngle, slice.endAngle)
-                  return (
-                    <path
-                      key={slice.code}
-                      d={path}
-                      fill={slice.color}
-                      stroke="#ffffff"
-                      strokeWidth="2"
-                      className="cursor-pointer transition-all duration-150"
-                      opacity={isActive ? 1 : 0.9}
-                      onMouseEnter={() => setActiveCode(slice.code)}
-                      onClick={() => setActiveCode(slice.code)}
-                    >
-                      <title>{`${slice.code} · ${slice.title} · ${slice.percent.toFixed(1)}%`}</title>
-                    </path>
-                  )
-                })}
-              </svg>
-              <div className="absolute inset-[26%] rounded-full bg-white shadow-inner flex flex-col items-center justify-center text-center px-2">
-                <p className="text-[11px] tracking-wide text-base-mute">当前高亮</p>
-                <p className="text-sm font-bold text-base-text">{activeType.code}</p>
-                <p className="text-[11px] text-base-mute mt-0.5 truncate max-w-full">{activeType.title}</p>
-                <p className="text-xs font-semibold text-brand-cyan mt-0.5">{activeType.percent.toFixed(1)}%</p>
-              </div>
-            </motion.div>
+            {isLoading ? (
+              <div className="relative mx-auto h-[220px] w-[220px] sm:h-[240px] sm:w-[240px] rounded-full bg-gray-200 animate-pulse" />
+            ) : (
+              <motion.div
+                className="relative mx-auto h-[220px] w-[220px] sm:h-[240px] sm:w-[240px]"
+                initial={{ rotate: -15, opacity: 0.4 }}
+                animate={{ rotate: 0, opacity: 1 }}
+                transition={{ duration: 0.7, ease: 'easeOut' }}
+              >
+                <svg viewBox="0 0 240 240" className="h-full w-full">
+                  {donutSlices.map((slice) => {
+                    const isActive = activeType?.code === slice.code
+                    const path = createDonutSlicePath(120, 120, isActive ? 108 : 104, 62, slice.startAngle, slice.endAngle)
+                    return (
+                      <path
+                        key={slice.code}
+                        d={path}
+                        fill={slice.color}
+                        stroke="#ffffff"
+                        strokeWidth="2"
+                        className="cursor-pointer transition-all duration-150"
+                        opacity={isActive ? 1 : 0.9}
+                        onMouseEnter={() => setActiveCode(slice.code)}
+                        onClick={() => setActiveCode(slice.code)}
+                      >
+                        <title>{`${slice.code} · ${slice.title} · ${slice.percent.toFixed(1)}%`}</title>
+                      </path>
+                    )
+                  })}
+                </svg>
+                <div className="absolute inset-[26%] rounded-full bg-white shadow-inner flex flex-col items-center justify-center text-center px-2">
+                  <p className="text-[11px] tracking-wide text-base-mute">当前高亮</p>
+                  <p className="text-sm font-bold text-base-text">{activeType.code}</p>
+                  <p className="text-[11px] text-base-mute mt-0.5 truncate max-w-full">{activeType.title}</p>
+                  <p className="text-xs font-semibold text-brand-cyan mt-0.5">
+                    {hasData ? `${activeType.percent.toFixed(1)}%` : '--'}
+                  </p>
+                </div>
+              </motion.div>
+            )}
             <p className="mt-2 text-center text-xs text-base-mute">
               提示：悬浮或点击任意扇区，查看对应 CPTI 信息
             </p>
@@ -274,7 +354,7 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
               const isActive = activeType?.code === item.code
               return (
                 <button
-                  key={item.code}
+                  key={item.code === '--' ? item.key : item.code}
                   type="button"
                   onMouseEnter={() => setActiveCode(item.code)}
                   onClick={() => setActiveCode(item.code)}
@@ -292,7 +372,7 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
                       {rank}. {item.code}
                     </p>
                     <span className="ml-auto text-[11px] text-brand-cyan font-semibold shrink-0">
-                      {valueText}
+                      {hasData ? valueText : '--'}
                     </span>
                   </div>
                   <p className="mt-1 text-[11px] text-base-mute truncate">{item.title}</p>
@@ -307,12 +387,12 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
         <div className="rounded-card border border-gray-100 bg-white p-4 shadow-card md:p-5">
           <h2 className="text-h2">四色系占比</h2>
           <div className="mt-4 space-y-3">
-            {statsData.groupDistribution.map((item) => (
+            {(hasData ? statsData.groupDistribution : PLACEHOLDER_GROUPS).map((item) => (
               <div key={item.group} className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-semibold text-base-text">{item.label}</span>
                   <span className="text-base-mute">
-                    {item.percent.toFixed(1)}% · {formatNumber(item.count)} 人
+                    {hasData ? `${item.percent.toFixed(1)}% · ${formatNumber(item.count)} 人` : '--'}
                   </span>
                 </div>
                 <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
@@ -320,7 +400,7 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
                     className="h-full rounded-full"
                     style={{ backgroundColor: item.accent }}
                     initial={{ width: 0 }}
-                    animate={{ width: `${item.percent}%` }}
+                    animate={{ width: `${hasData ? item.percent : 0}%` }}
                     transition={{ duration: 0.7, ease: 'easeOut' }}
                   />
                 </div>
@@ -331,8 +411,8 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
 
         <div className="rounded-card border border-gray-100 bg-white p-4 shadow-card md:p-5 space-y-4">
           <h2 className="text-h2">趣味洞察</h2>
-          {statsData.insights.map((insight) => (
-            <article key={insight.title} className="rounded-xl border border-gray-100 bg-gray-50/70 p-3">
+          {(hasData ? statsData.insights : PLACEHOLDER_INSIGHTS).map((insight) => (
+            <article key={insight.title === '--' ? insight.key : insight.title} className="rounded-xl border border-gray-100 bg-gray-50/70 p-3">
               <p className="text-xs font-semibold text-brand-cyan tracking-wide">{insight.title}</p>
               <p className="mt-1 text-sm font-semibold text-base-text">{insight.value}</p>
               <p className="mt-1 text-xs leading-relaxed text-base-mute">{insight.note}</p>
@@ -348,10 +428,10 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
             <h3 className="text-sm font-semibold text-base-text">Top 3 高频类型</h3>
           </div>
           <div className="mt-3 space-y-2">
-            {statsData.top3.map((item) => (
-              <p key={item.code} className="text-sm text-base-text">
+            {(hasData ? statsData.top3 : PLACEHOLDER_TOP_BOTTOM).map((item) => (
+              <p key={item.code === '--' ? item.key : item.code} className="text-sm text-base-text">
                 {item.code} · {item.title}
-                <span className="ml-2 text-xs text-base-mute">{item.percent.toFixed(1)}%</span>
+                <span className="ml-2 text-xs text-base-mute">{hasData ? `${item.percent.toFixed(1)}%` : '--'}</span>
               </p>
             ))}
           </div>
@@ -363,10 +443,10 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
             <h3 className="text-sm font-semibold text-base-text">Top 3 稀有类型</h3>
           </div>
           <div className="mt-3 space-y-2">
-            {statsData.bottom3.map((item) => (
-              <p key={item.code} className="text-sm text-base-text">
+            {(hasData ? statsData.bottom3 : PLACEHOLDER_TOP_BOTTOM).map((item) => (
+              <p key={item.code === '--' ? item.key : item.code} className="text-sm text-base-text">
                 {item.code} · {item.title}
-                <span className="ml-2 text-xs text-base-mute">{item.percent.toFixed(1)}%</span>
+                <span className="ml-2 text-xs text-base-mute">{hasData ? `${item.percent.toFixed(1)}%` : '--'}</span>
               </p>
             ))}
           </div>
