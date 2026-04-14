@@ -69,7 +69,7 @@
 - **样式系统**：Tailwind CSS 3
 - **动画**：Framer Motion
 - **图标**：Lucide React
-- **后端形态**：Vercel Serverless Functions（`/api`）
+- **后端形态**：Vercel Serverless（`/api`）+ Cloudflare Pages Functions（`/functions/api`）
 - **数据库**：Supabase（统计存储与聚合视图）
 
 ---
@@ -78,11 +78,15 @@
 
 ```text
 CPTI/
-├─ api/                         # Vercel Serverless API
+├─ api/                         # Vercel Serverless API（兼容层）
 │  ├─ _shared/
 │  │  └─ stats-helpers.js       # 统计聚合辅助函数、合法类型定义
 │  ├─ stats-submit.js           # 提交测评结果（写入 Supabase）
 │  └─ stats-summary.js          # 拉取统计汇总（读视图）
+├─ functions/
+│  └─ api/                      # Cloudflare Pages Functions（兼容层）
+│     ├─ stats-submit.js
+│     └─ stats-summary.js
 ├─ public/
 │  ├─ logo.png
 │  └─ images/cpti/              # 16 型配图（按 CODE 命名）
@@ -114,6 +118,8 @@ CPTI/
 │  └─ index.css
 ├─ supabase/
 │  └─ stats_schema.sql          # Supabase 表、索引、RLS、统计视图
+├─ server/
+│  └─ stats-service.js          # Vercel + Cloudflare 共用统计服务逻辑
 ├─ cpti_prd.md                  # 产品需求文档（权威）
 └─ README.md
 ```
@@ -219,16 +225,17 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 - 还原 16 型计数并计算占比、Top3/Bottom3、色系分布
 - 响应缓存：`s-maxage=60, stale-while-revalidate=300`
 
-### 前端回退策略
+### 前端失败策略
 
-- 在线汇总不可用时，`StatsPage` 自动回退 `src/data/stats.js` 演示数据
-- 页面会显示“演示回退数据”提示，保证页面可用性
+- 首屏先显示骨架屏（不注入静态统计值）
+- 若在线汇总失败，显示错误提示与 `--` 占位
+- 用户可点击“重试获取数据”手动重拉
 
 ---
 
 ## 部署说明
 
-推荐部署平台：**Vercel**
+支持两种部署平台：**Vercel** 与 **Cloudflare Pages**
 
 ### 1) 基础配置
 
@@ -236,12 +243,18 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 - Build Command：`npm run build`
 - Output Directory：`dist`
 
-### 2) 环境变量（Vercel Project Settings）
+### 2) 环境变量（Vercel / Cloudflare 均需配置）
 
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 
-### 3) Supabase 初始化
+### 3) 平台路由说明
+
+- Vercel：使用 `api/` 下函数文件
+- Cloudflare Pages：使用 `functions/` 下函数文件
+- 前端始终请求统一路径：`/api/stats-submit` 与 `/api/stats-summary`
+
+### 4) Supabase 初始化
 
 在 Supabase SQL Editor 执行：
 
@@ -258,13 +271,14 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
 ## 常见问题（开发侧）
 
-### Q1：为什么统计页显示的是“演示回退数据”？
+### Q1：为什么统计页显示“--”并提示获取失败？
 
 通常是以下原因：
 
-- 未配置 Supabase 环境变量
+- 未配置 Supabase 环境变量（或配在错误环境）
 - 数据库 SQL 未初始化
 - API 路由部署异常或返回非 200
+- Cloudflare 下未生效 `functions/api/*` 路由
 
 ### Q2：如何新增或修改题目？
 
