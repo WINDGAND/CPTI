@@ -30,7 +30,7 @@ const DIMENSION_ROWS = Object.values(DIMENSION_DETAILS)
 /** 统一分区头：编号圈 + 标题 + 主题色细线 */
 function SectionHeader({ num, title }) {
   return (
-    <div className="flex items-center gap-3 mb-5">
+    <div className="result-section-header flex items-center gap-3">
       <span
         className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
         style={{ backgroundColor: 'var(--poster-accent)' }}
@@ -48,7 +48,7 @@ function SectionHeader({ num, title }) {
 
 /** 分区之间的间距分隔 */
 function Divider() {
-  return <div className="my-8 h-px bg-gray-100" />
+  return <div className="result-divider" />
 }
 
 function renderSpectrum(percentages) {
@@ -281,16 +281,16 @@ export default function ResultPoster({ resultData, onRestart }) {
                 <p className="text-xs font-semibold text-base-text">
                   {isDualMode ? '结果解释' : '单人结果说明'}
                 </p>
-                <p className="mt-1 text-sm leading-relaxed text-base-mute">
+                <p className="result-prose-muted mt-2">
                   {resultIntro ?? (isDualMode
                     ? '这份结果来自双方独立作答后的合成结果，会同时展示你们的一致部分和错位部分。'
                     : '这份结果代表你如何理解这段关系，是你的主观感知画像，不等于双方最终完全一致的 Couple Type。')}
                 </p>
               </div>
 
-              <div className="space-y-3 text-left text-base-text">
+              <div className="result-list text-left">
                 {result.description.map((line, i) => (
-                  <p key={i} className="text-sm md:text-[0.9375rem] leading-relaxed">
+                  <p key={i} className="result-prose">
                     {line}
                   </p>
                 ))}
@@ -309,9 +309,9 @@ export default function ResultPoster({ resultData, onRestart }) {
           <>
             <Divider />
             <SectionHeader num="③" title="一致与错位" />
-            <div className="space-y-3">
+            <div className="result-list">
               <div className="rounded-xl border border-green-100 bg-green-50/60 p-4">
-                <div className="mb-2 flex items-center gap-2">
+                <div className="mb-3 flex items-center gap-2">
                   <Sparkles size={14} className="text-green-600" />
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-green-700">
                     你们最一致的维度
@@ -320,13 +320,13 @@ export default function ResultPoster({ resultData, onRestart }) {
                 <p className="text-sm font-semibold text-base-text">
                   {resultData.alignment.mostAlignedDimension.title}
                 </p>
-                <p className="mt-1 text-xs leading-relaxed text-base-mute">
+                <p className="result-prose-muted mt-2">
                   双方在这个维度上的一致度为 {resultData.alignment.mostAlignedDimension.consensus}%。
                   这意味着你们对这段关系的理解高度同频，更容易形成“我们本来就是这样”的稳定默契。
                 </p>
               </div>
               <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-4">
-                <div className="mb-2 flex items-center gap-2">
+                <div className="mb-3 flex items-center gap-2">
                   <AlertCircle size={14} className="text-amber-500" />
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-amber-700">
                     最容易错位的维度
@@ -335,7 +335,7 @@ export default function ResultPoster({ resultData, onRestart }) {
                 <p className="text-sm font-semibold text-base-text">
                   {resultData.alignment.mostMisalignedDimension.title}
                 </p>
-                <p className="mt-1 text-xs leading-relaxed text-base-mute">
+                <p className="result-prose-muted mt-2">
                   {differenceHint ?? '这里是你们最容易“各自觉得自己很合理”的地方。它不代表不合适，只说明双方感知落差最大，最值得在日常里多确认一次彼此真正的需要。'}
                 </p>
               </div>
@@ -343,7 +343,7 @@ export default function ResultPoster({ resultData, onRestart }) {
 
             <Divider />
             <SectionHeader num="④" title="双方视角对照" />
-            <div className="space-y-3">
+            <div className="result-list">
               {resultData.players.map((player, idx) => (
                 <div key={player.id} className="rounded-xl border border-gray-100 bg-white/90 p-4">
                   <p className="text-xs font-semibold text-base-mute">第 {idx + 1} 位视角</p>
@@ -352,7 +352,7 @@ export default function ResultPoster({ resultData, onRestart }) {
                       <p className="text-lg font-bold text-base-text">{player.code}</p>
                       <p className="text-xs text-base-mute">{player.result?.title}</p>
                     </div>
-                    <p className="text-[11px] text-base-mute">这是 Ta 主观看到的关系版本</p>
+                    <p className="result-prose-muted">这是 Ta 主观看到的关系版本</p>
                   </div>
                 </div>
               ))}
@@ -365,7 +365,7 @@ export default function ResultPoster({ resultData, onRestart }) {
         {/* ── ③/⑤ 关系优势 ────────────────────────────── */}
         <SectionHeader num={isDualMode ? '⑤' : '③'} title="关系优势" />
 
-        <div className="space-y-3">
+        <div className="result-list">
           {result.strengths.map(({ title, desc }, i) => (
             <motion.div
               key={i}
@@ -374,14 +374,10 @@ export default function ResultPoster({ resultData, onRestart }) {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: i * 0.08, duration: 0.3 }}
             >
-              <CheckCircle2
-                size={18}
-                className="shrink-0 mt-0.5"
-                style={{ color: 'var(--poster-accent)' }}
-              />
+              <CheckCircle2 size={18} className="shrink-0 mt-1" style={{ color: 'var(--poster-accent)' }} />
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-base-text leading-snug">{title}</p>
-                <p className="text-xs text-base-mute leading-relaxed mt-0.5">{desc}</p>
+                <p className="result-item-title">{title}</p>
+                <p className="result-item-desc">{desc}</p>
               </div>
             </motion.div>
           ))}
@@ -392,7 +388,7 @@ export default function ResultPoster({ resultData, onRestart }) {
         {/* ── ④/⑥ 关系挑战 ────────────────────────────── */}
         <SectionHeader num={isDualMode ? '⑥' : '④'} title="关系挑战" />
 
-        <div className="space-y-3">
+        <div className="result-list">
           {result.challenges.map(({ title, desc }, i) => (
             <motion.div
               key={i}
@@ -401,13 +397,10 @@ export default function ResultPoster({ resultData, onRestart }) {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: i * 0.08, duration: 0.3 }}
             >
-              <AlertCircle
-                size={18}
-                className="shrink-0 mt-0.5 text-amber-400"
-              />
+              <AlertCircle size={18} className="shrink-0 mt-1 text-amber-400" />
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-base-text leading-snug">{title}</p>
-                <p className="text-xs text-base-mute leading-relaxed mt-0.5">{desc}</p>
+                <p className="result-item-title">{title}</p>
+                <p className="result-item-desc">{desc}</p>
               </div>
             </motion.div>
           ))}
@@ -418,32 +411,32 @@ export default function ResultPoster({ resultData, onRestart }) {
         {/* ── ⑤/⑦ 冲突模式 ────────────────────────────── */}
         <SectionHeader num={isDualMode ? '⑦' : '⑤'} title="冲突模式" />
 
-        <div className="space-y-3">
+        <div className="result-list">
           {/* 触发模式 */}
           <div
-            className="rounded-xl p-4 space-y-1.5"
+            className="rounded-xl p-4 space-y-2"
             style={{ backgroundColor: 'color-mix(in srgb, var(--poster-accent) 10%, white)' }}
           >
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-3">
               <MessageCircleHeart size={14} style={{ color: 'var(--poster-accent)' }} />
               <span className="text-[11px] font-semibold text-base-mute uppercase tracking-wider">
                 典型触发模式
               </span>
             </div>
-            <p className="text-sm text-base-text leading-relaxed">
+            <p className="result-prose">
               {result.conflictPattern.pattern}
             </p>
           </div>
 
           {/* 和解方式 */}
-          <div className="rounded-xl p-4 space-y-1.5 bg-green-50/60 border border-green-100">
-            <div className="flex items-center gap-2 mb-2">
+          <div className="rounded-xl p-4 space-y-2 bg-green-50/60 border border-green-100">
+            <div className="flex items-center gap-2 mb-3">
               <CheckCircle2 size={14} className="text-green-500" />
               <span className="text-[11px] font-semibold text-green-600 uppercase tracking-wider">
                 惯用和解方式
               </span>
             </div>
-            <p className="text-sm text-base-text leading-relaxed">
+            <p className="result-prose">
               {result.conflictPattern.resolution}
             </p>
           </div>
@@ -515,7 +508,7 @@ export default function ResultPoster({ resultData, onRestart }) {
             <Compass size={15} style={{ color: 'var(--poster-accent)' }} />
             <span className="text-xs font-semibold text-base-mute">这段关系未来的样子</span>
           </div>
-          <p className="text-sm text-base-text leading-relaxed">{result.longterm}</p>
+          <p className="result-prose">{result.longterm}</p>
         </div>
 
         <Divider />
@@ -523,7 +516,7 @@ export default function ResultPoster({ resultData, onRestart }) {
         {/* ── ⑧/⑩ 相处 Tips ──────────────────────────── */}
         <SectionHeader num={isDualMode ? '⑩' : '⑧'} title="相处 Tips" />
 
-        <div className="space-y-3">
+        <div className="result-list">
           {result.tipsForCouple.map((tip, i) => (
             <div key={i} className="flex gap-3 items-start">
               <div
@@ -532,7 +525,7 @@ export default function ResultPoster({ resultData, onRestart }) {
               >
                 <Lightbulb size={12} style={{ color: 'var(--poster-accent)' }} />
               </div>
-              <p className="text-sm text-base-text leading-relaxed">{tip}</p>
+              <p className="result-prose">{tip}</p>
             </div>
           ))}
         </div>

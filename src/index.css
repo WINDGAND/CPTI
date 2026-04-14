@@ -173,4 +173,33 @@
       padding-top: calc(2.4375rem + 2.5rem);
     }
   }
+
+  /* 结果页：统一阅读节奏与层级 */
+  .result-section-header {
+    @apply mb-6 md:mb-7;
+  }
+
+  .result-divider {
+    @apply my-9 md:my-10 h-px bg-gray-100;
+  }
+
+  .result-prose {
+    @apply text-sm leading-7 text-base-text;
+  }
+
+  .result-prose-muted {
+    @apply text-[13px] leading-6 text-base-mute;
+  }
+
+  .result-list {
+    @apply space-y-4;
+  }
+
+  .result-item-title {
+    @apply text-sm font-semibold leading-6 text-base-text;
+  }
+
+  .result-item-desc {
+    @apply mt-1.5 text-[13px] leading-6 text-base-mute;
+  }
 }
