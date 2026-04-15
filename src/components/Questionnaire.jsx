@@ -1006,20 +1006,8 @@ export default function Questionnaire({ onComplete }) {
               </div>
 
               <div className="flex flex-col gap-2 sm:flex-row">
-                <button
-                  type="button"
-                  className={[
-                    'flex-1 py-3 rounded-btn text-sm font-semibold transition-all duration-150',
-                    inviteCopied
-                      ? 'bg-brand-green text-white border border-brand-green shadow-sm'
-                      : 'btn-primary',
-                  ].join(' ')}
-                  onClick={handleCopyInviteLink}
-                >
-                  {inviteCopied ? '链接已复制' : '复制邀请链接'}
-                </button>
                 <a
-                  className="btn-ghost flex-1 py-3 text-center"
+                  className="btn-ghost w-full py-3 text-center"
                   href={inviteLink}
                   target="_blank"
                   rel="noreferrer"
@@ -1027,10 +1015,6 @@ export default function Questionnaire({ onComplete }) {
                   打开邀请链接
                 </a>
               </div>
-
-              <p className="text-xs text-green-600 min-h-[1.25rem]">
-                {inviteCopied ? '已复制，可直接发给 TA' : ' '}
-              </p>
 
               <button
                 type="button"
