@@ -8,10 +8,13 @@ import {
   stripDualInviteFromUrl,
 } from '../utils/inviteCodec'
 import { consumeDualInvite, createDualInvite, probeDualInvite } from '../utils/statsApi'
+import { clearQuizDraft, readQuizDraft, saveQuizDraft } from '../utils/quizDraft'
 
 const INITIAL_COUNT = 6
 const LOAD_STEP     = 6          // 每次多加载 6 题，减少触发次数
 const ANSWER_COOLDOWN_MS = 1200  // 两次作答之间最短间隔（ms）
+const DRAFT_SAVE_DEBOUNCE_MS = 250
+const RESTART_CONFIRM_THRESHOLD = 5
 
 const INVITE_ERROR_COPY = {
   'legacy-link-unsupported': '这份邀请链接来自旧版本，暂时无法继续，请让对方重新发起双人拼图。',
@@ -20,6 +23,26 @@ const INVITE_ERROR_COPY = {
   'invite-used': '这份邀请链接已被使用，不能重复参与，请让对方重新发起双人拼图。',
   'invite-expired': '这份邀请链接已过期（有效期24小时），请让对方重新发起双人拼图。',
   'question-count-mismatch': '这份邀请链接和当前题库不匹配，请让对方重新发起一次双人拼图。',
+}
+
+function getAnsweredCount(answers) {
+  return Object.keys(answers || {}).length
+}
+
+function getFirstMissingIndex(answers) {
+  return QUESTIONS.findIndex((question) => !(question.id in (answers || {})))
+}
+
+function getRevealCountByAnswers(answers, total) {
+  const answeredQuestionIds = new Set(Object.keys(answers || {}))
+  let maxAnsweredIdx = -1
+  QUESTIONS.forEach((question, idx) => {
+    if (answeredQuestionIds.has(question.id)) {
+      maxAnsweredIdx = idx
+    }
+  })
+
+  return Math.min(total, Math.max(INITIAL_COUNT, maxAnsweredIdx + 1))
 }
 
 /**
@@ -46,6 +69,9 @@ export default function Questionnaire({ onComplete }) {
   const [inviteToken, setInviteToken] = useState('')
   const [enteredFromInvite, setEnteredFromInvite] = useState(false)
   const [completionError, setCompletionError] = useState('')
+  const [resumeDraft, setResumeDraft] = useState(null)
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, source: '', count: 0 })
+  const [hydrationDone, setHydrationDone] = useState(false)
   const [focusedIdx, setFocusedIdx] = useState(0)
   const [revealCount, setRevealCount] = useState(INITIAL_COUNT)
   const [cooldownMsg, setCooldownMsg] = useState(false)  // 作答过快提示
@@ -147,10 +173,60 @@ export default function Questionnaire({ onComplete }) {
     return () => clearTimeout(timer)
   }, [inviteCopied])
 
+  function resetToEntry() {
+    const emptyAnswers = {}
+    setSelectedMode(null)
+    setAnswers(emptyAnswers)
+    setActivePlayerIdx(0)
+    setDualAnswerSets([emptyAnswers, emptyAnswers])
+    setRevealCount(INITIAL_COUNT)
+    setFocusedIdx(0)
+    lastAnswerTimeRef.current = 0
+    scrollLockRef.current = null
+    setInviteLink('')
+    setInviteCopied(false)
+    setInviteToken('')
+    setEnteredFromInvite(false)
+    setInviteError('')
+    setCompletionError('')
+  }
+
+  function restoreFromDraft(draft) {
+    setSelectedMode(draft.selectedMode)
+    setAnswers(draft.answers)
+    setDualAnswerSets(draft.dualAnswerSets)
+    setActivePlayerIdx(draft.activePlayerIdx)
+    setInviteLink(draft.inviteLink)
+    setInviteCopied(false)
+    setInviteToken(draft.inviteToken)
+    setInviteError('')
+    setEnteredFromInvite(draft.enteredFromInvite)
+
+    const reveal = getRevealCountByAnswers(draft.answers, total)
+    setRevealCount(reveal)
+    const missingIdx = getFirstMissingIndex(draft.answers)
+    const nextFocus = missingIdx === -1 ? Math.max(0, reveal - 1) : missingIdx
+    setFocusedIdx(nextFocus)
+    lastAnswerTimeRef.current = 0
+    scrollLockRef.current = null
+    setTimeout(() => {
+      itemRefs.current[nextFocus]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 200)
+  }
+
+  function openRestartConfirm(source, count) {
+    setConfirmDialog({ open: true, source, count })
+  }
+
+  function closeRestartConfirm() {
+    setConfirmDialog({ open: false, source: '', count: 0 })
+  }
+
   useEffect(() => {
     const parsed = readDualInviteFromSearch()
 
     if (parsed.status === 'ready') {
+      clearQuizDraft()
       const emptyAnswers = {}
       setSelectedMode('dual')
       setAnswers(emptyAnswers)
@@ -191,6 +267,7 @@ export default function Questionnaire({ onComplete }) {
       setTimeout(() => {
         itemRefs.current[0]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
       }, 200)
+      setHydrationDone(true)
       return
     }
 
@@ -199,25 +276,69 @@ export default function Questionnaire({ onComplete }) {
       setInviteError(INVITE_ERROR_COPY[parsed.reason] ?? fallbackMessage)
       window.history.replaceState({}, '', stripDualInviteFromUrl())
     }
+
+    const draftResult = readQuizDraft(QUESTIONS)
+    if (draftResult.status === 'ready') {
+      const answeredCountFromDraft = getAnsweredCount(draftResult.draft.answers)
+      if (answeredCountFromDraft > 0) {
+        setResumeDraft({
+          ...draftResult.draft,
+          answeredCount: answeredCountFromDraft,
+        })
+      } else {
+        clearQuizDraft()
+      }
+    }
+
+    setHydrationDone(true)
   }, [])
+
+  useEffect(() => {
+    if (!hydrationDone) return undefined
+
+    const hasDraftContent =
+      modeChosen ||
+      answeredCount > 0 ||
+      enteredFromInvite ||
+      Boolean(inviteToken) ||
+      Boolean(inviteLink)
+
+    if (!hasDraftContent) {
+      clearQuizDraft()
+      return undefined
+    }
+
+    const timer = setTimeout(() => {
+      saveQuizDraft(QUESTIONS, {
+        selectedMode,
+        activePlayerIdx,
+        answers,
+        dualAnswerSets,
+        inviteToken,
+        inviteLink,
+        enteredFromInvite,
+      })
+    }, DRAFT_SAVE_DEBOUNCE_MS)
+
+    return () => clearTimeout(timer)
+  }, [
+    hydrationDone,
+    modeChosen,
+    answeredCount,
+    selectedMode,
+    activePlayerIdx,
+    answers,
+    dualAnswerSets,
+    inviteToken,
+    inviteLink,
+    enteredFromInvite,
+  ])
 
   // ── 选择模式（第0题） ──────────────────────────────────────
   function resetForModeStart(mode) {
-    const emptyAnswers = {}
+    clearQuizDraft()
+    resetToEntry()
     setSelectedMode(mode)
-    setAnswers(emptyAnswers)
-    setActivePlayerIdx(0)
-    setDualAnswerSets([emptyAnswers, emptyAnswers])
-    setRevealCount(INITIAL_COUNT)
-    setFocusedIdx(0)
-    lastAnswerTimeRef.current = 0
-    scrollLockRef.current = null
-    setInviteLink('')
-    setInviteCopied(false)
-    setInviteToken('')
-    setEnteredFromInvite(false)
-    setInviteError('')
-    setCompletionError('')
   }
 
   function chooseSolo() {
@@ -234,6 +355,68 @@ export default function Questionnaire({ onComplete }) {
     setTimeout(() => {
       itemRefs.current[0]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }, 200)
+  }
+
+  function requestModeChange(nextMode) {
+    if (answeredCount >= RESTART_CONFIRM_THRESHOLD) {
+      openRestartConfirm(nextMode === 'single' ? 'switch-single' : 'switch-dual', answeredCount)
+      return
+    }
+
+    if (nextMode === 'single') {
+      chooseSolo()
+      return
+    }
+    chooseDual()
+  }
+
+  function requestRestartDualFlow() {
+    if (answeredCount >= RESTART_CONFIRM_THRESHOLD) {
+      openRestartConfirm('restart-dual-flow', answeredCount)
+      return
+    }
+    chooseDual()
+  }
+
+  function handleResumeContinue() {
+    if (!resumeDraft) return
+    restoreFromDraft(resumeDraft)
+    setResumeDraft(null)
+    setHydrationDone(true)
+  }
+
+  function handleResumeRestart() {
+    if (!resumeDraft) return
+    if ((resumeDraft.answeredCount ?? 0) >= RESTART_CONFIRM_THRESHOLD) {
+      openRestartConfirm('resume-restart', resumeDraft.answeredCount)
+      return
+    }
+    clearQuizDraft()
+    setResumeDraft(null)
+    resetToEntry()
+    setHydrationDone(true)
+  }
+
+  function handleConfirmRestart() {
+    const { source } = confirmDialog
+    closeRestartConfirm()
+    clearQuizDraft()
+
+    if (source === 'resume-restart') {
+      setResumeDraft(null)
+      resetToEntry()
+      setHydrationDone(true)
+      return
+    }
+
+    if (source === 'switch-single') {
+      chooseSolo()
+      return
+    }
+
+    if (source === 'switch-dual' || source === 'restart-dual-flow') {
+      chooseDual()
+    }
   }
 
   async function handleCopyInviteLink() {
@@ -376,6 +559,60 @@ export default function Questionnaire({ onComplete }) {
 
   return (
     <div>
+      {resumeDraft && (
+        <div className="fixed inset-0 z-[70] bg-black/35 backdrop-blur-[1px] px-4">
+          <div className="mx-auto mt-[18vh] w-full max-w-md rounded-card border border-gray-100 bg-white p-5 shadow-xl">
+            <p className="text-base font-semibold text-base-text">检测到上次未完成作答</p>
+            <p className="mt-2 text-sm leading-relaxed text-base-mute">
+              你上次已完成 {resumeDraft.answeredCount} / {total} 题。可以继续上次进度，也可以重新开始。
+            </p>
+            <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                className="btn-primary flex-1 py-2.5 text-sm"
+                onClick={handleResumeContinue}
+              >
+                继续上次作答
+              </button>
+              <button
+                type="button"
+                className="btn-ghost flex-1 py-2.5 text-sm"
+                onClick={handleResumeRestart}
+              >
+                重新开始
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDialog.open && (
+        <div className="fixed inset-0 z-[80] bg-black/40 px-4">
+          <div className="mx-auto mt-[22vh] w-full max-w-sm rounded-card border border-rose-100 bg-white p-5 shadow-xl">
+            <p className="text-base font-semibold text-base-text">确认重新开始？</p>
+            <p className="mt-2 text-sm leading-relaxed text-base-mute">
+              你当前已作答 {confirmDialog.count} 题，重新开始会清空已保存的作答记录。
+            </p>
+            <div className="mt-5 flex gap-2">
+              <button
+                type="button"
+                className="btn-ghost flex-1 py-2.5 text-sm"
+                onClick={closeRestartConfirm}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                className="flex-1 rounded-btn bg-rose-500 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-600"
+                onClick={handleConfirmRestart}
+              >
+                确认重开
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── 始终可见的 sticky 进度条 ── */}
       <div className="sticky top-16 sm:top-[4.5rem] lg:top-20 z-40 bg-base-bg pt-3 pb-1 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10">
         <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden">
@@ -428,7 +665,7 @@ export default function Questionnaire({ onComplete }) {
       </div>
 
       <div className="mt-2">
-        {!enteredFromInvite && initialInviteStatus !== 'ready' && (
+        {!enteredFromInvite && !(initialInviteStatus === 'ready' && selectedMode === 'dual') && (
           <motion.div
             ref={q0Ref}
             animate={{ opacity: isQ0Active || !modeChosen ? 1 : 0.35 }}
@@ -459,7 +696,7 @@ export default function Questionnaire({ onComplete }) {
                     ? 'border-brand-cyan bg-brand-cyan text-white'
                     : 'border-brand-cyan text-brand-cyan hover:bg-brand-cyan hover:text-white',
                 ].join(' ')}
-                onClick={chooseSolo}
+                onClick={() => requestModeChange('single')}
               >
                 单人速通：先看我眼中的我们
               </button>
@@ -470,7 +707,7 @@ export default function Questionnaire({ onComplete }) {
                     ? 'border-brand-purple bg-brand-purple text-white'
                     : 'border-gray-200 text-base-mute hover:border-brand-purple hover:text-brand-purple',
                 ].join(' ')}
-                onClick={chooseDual}
+                onClick={() => requestModeChange('dual')}
               >
                 双人拼图：解锁真正的情侣合成结果
               </button>
@@ -567,7 +804,7 @@ export default function Questionnaire({ onComplete }) {
               <button
                 type="button"
                 className="text-sm text-base-mute underline underline-offset-4"
-                onClick={chooseDual}
+                onClick={requestRestartDualFlow}
               >
                 重新开始这次双人拼图
               </button>

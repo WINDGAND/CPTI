@@ -11,6 +11,7 @@ import { QUESTIONS, QUESTIONS_PER_DIMENSION } from './data/questions'
 import { computeDualModeResult, computeSingleModeResult } from './utils/scoring'
 import { submitStats } from './utils/statsApi'
 import { preloadTypeImage } from './data/typeImages'
+import { clearQuizDraft } from './utils/quizDraft'
 
 const ResultPoster = lazy(() => import('./components/ResultPoster'))
 const CoupleTypesPage = lazy(() => import('./components/types/CoupleTypesPage'))
@@ -84,6 +85,7 @@ export default function App() {
 
   // 答题完成 → 计算结果 → 进入 Loading
   function handleQuizComplete(payload) {
+    clearQuizDraft()
     const computed = payload.mode === 'dual'
       ? computeDualModeResult(QUESTIONS, payload.answers, QUESTIONS_PER_DIMENSION)
       : computeSingleModeResult(QUESTIONS, payload.answers, QUESTIONS_PER_DIMENSION)
@@ -115,6 +117,7 @@ export default function App() {
 
   // 重新测试
   function handleRestart() {
+    clearQuizDraft()
     goQuizHome()
   }
 
