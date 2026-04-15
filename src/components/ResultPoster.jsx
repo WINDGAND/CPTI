@@ -11,10 +11,11 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { DIMENSION_DETAILS, getResultByCode } from '../utils/scoring'
-import { createDualInviteLink } from '../utils/inviteCodec'
+import { createDualInviteLink, INVITE_SCHEMA_VERSION } from '../utils/inviteCodec'
 import { QUESTIONS } from '../data/questions'
 import { getTypeImageSources } from '../data/typeImages'
 import { recordImageMetric } from '../utils/imageMetrics'
+import { createDualInvite } from '../utils/statsApi'
 
 /**
  * ResultPoster — 多分节深度报告页（8 个分区）
@@ -171,6 +172,9 @@ export default function ResultPoster({ resultData, onRestart }) {
   const [nickname1, setNickname1] = useState('')
   const [nickname2, setNickname2] = useState('')
   const [inviteCopied, setInviteCopied] = useState(false)
+  const [singleInviteLink, setSingleInviteLink] = useState('')
+  const [singleInviteError, setSingleInviteError] = useState('')
+  const [singleInviteLoading, setSingleInviteLoading] = useState(false)
 
   const isDualMode = resultData.mode === 'dual'
   const perception = resultData.perception
@@ -181,15 +185,6 @@ export default function ResultPoster({ resultData, onRestart }) {
   const modeKey = isDualMode ? 'dual' : 'single'
   const resultIntro = result.introByMode?.[modeKey]
   const differenceHint = result.differenceHintByMode?.[modeKey]
-  let singleInviteLink = ''
-  if (!isDualMode && perception?.sourceAnswers) {
-    try {
-      singleInviteLink = createDualInviteLink(QUESTIONS, perception.sourceAnswers)
-    } catch {
-      singleInviteLink = ''
-    }
-  }
-
   const soulmateResult = getResultByCode(result.soulmate)
   const nemesisResult  = getResultByCode(result.nemesis)
 
@@ -209,17 +204,38 @@ export default function ResultPoster({ resultData, onRestart }) {
   }
 
   async function handleCopySingleInvite() {
-    if (!singleInviteLink) return
+    if (!isDualMode && !perception?.sourceAnswers) return
+
+    let link = singleInviteLink
+    if (!link) {
+      try {
+        setSingleInviteLoading(true)
+        setSingleInviteError('')
+        const created = await createDualInvite({
+          answersA: perception.sourceAnswers,
+          questionCount: QUESTIONS.length,
+          schemaVersion: INVITE_SCHEMA_VERSION,
+          ttlHours: 24,
+        })
+        link = createDualInviteLink(created.token)
+        setSingleInviteLink(link)
+      } catch (error) {
+        setSingleInviteError(error?.message || '双人链接生成失败，请稍后重试。')
+        return
+      } finally {
+        setSingleInviteLoading(false)
+      }
+    }
 
     try {
       if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(singleInviteLink)
+        await navigator.clipboard.writeText(link)
       } else {
-        window.prompt('复制下面的双人拼图链接', singleInviteLink)
+        window.prompt('复制下面的双人拼图链接', link)
       }
       setInviteCopied(true)
     } catch {
-      window.prompt('复制下面的双人拼图链接', singleInviteLink)
+      window.prompt('复制下面的双人拼图链接', link)
       setInviteCopied(true)
     }
   }
@@ -657,8 +673,13 @@ export default function ResultPoster({ resultData, onRestart }) {
                     : 'btn-primary',
                 ].join(' ')}
                 onClick={handleCopySingleInvite}
+                disabled={singleInviteLoading}
               >
-                {inviteCopied ? '双人链接已复制' : '复制双人拼图链接'}
+                {singleInviteLoading
+                  ? '正在生成双人链接...'
+                  : inviteCopied
+                    ? '双人链接已复制'
+                    : '复制双人拼图链接'}
               </button>
               {singleInviteLink && (
                 <a
@@ -671,6 +692,9 @@ export default function ResultPoster({ resultData, onRestart }) {
                 </a>
               )}
             </div>
+            {singleInviteError && (
+              <p className="mt-2 text-xs text-rose-600">{singleInviteError}</p>
+            )}
             <p className="mt-2 text-xs text-green-600 min-h-[1.25rem]">
               {inviteCopied ? '已复制，可直接发给 TA' : ' '}
             </p>

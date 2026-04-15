@@ -7,15 +7,19 @@ import {
   readDualInviteFromSearch,
   stripDualInviteFromUrl,
 } from '../utils/inviteCodec'
+import { consumeDualInvite, createDualInvite, probeDualInvite } from '../utils/statsApi'
 
 const INITIAL_COUNT = 6
 const LOAD_STEP     = 6          // 每次多加载 6 题，减少触发次数
 const ANSWER_COOLDOWN_MS = 1200  // 两次作答之间最短间隔（ms）
 
 const INVITE_ERROR_COPY = {
-  'version-mismatch': '这个双人拼图链接来自旧版本题库，暂时无法继续，请重新生成一份新的邀请链接。',
+  'legacy-link-unsupported': '这份邀请链接来自旧版本，暂时无法继续，请让对方重新发起双人拼图。',
+  'invalid-token': '这份邀请链接无法识别，请让对方重新复制完整链接。',
+  'invite-invalid': '这份邀请链接无效或不存在，请让对方重新发起双人拼图。',
+  'invite-used': '这份邀请链接已被使用，不能重复参与，请让对方重新发起双人拼图。',
+  'invite-expired': '这份邀请链接已过期（有效期24小时），请让对方重新发起双人拼图。',
   'question-count-mismatch': '这份邀请链接和当前题库不匹配，请让对方重新发起一次双人拼图。',
-  'answer-length-mismatch': '这份邀请链接不完整，可能在分享过程中被截断了，请重新复制完整链接。',
 }
 
 /**
@@ -29,7 +33,7 @@ const INVITE_ERROR_COPY = {
  */
 export default function Questionnaire({ onComplete }) {
   const initialInviteStatus = typeof window !== 'undefined'
-    ? readDualInviteFromSearch(QUESTIONS, window.location.search).status
+    ? readDualInviteFromSearch(window.location.search).status
     : 'idle'
 
   const [selectedMode, setSelectedMode] = useState(null)
@@ -39,6 +43,7 @@ export default function Questionnaire({ onComplete }) {
   const [inviteLink, setInviteLink] = useState('')
   const [inviteCopied, setInviteCopied] = useState(false)
   const [inviteError, setInviteError] = useState('')
+  const [inviteToken, setInviteToken] = useState('')
   const [enteredFromInvite, setEnteredFromInvite] = useState(false)
   const [completionError, setCompletionError] = useState('')
   const [focusedIdx, setFocusedIdx] = useState(0)
@@ -143,22 +148,45 @@ export default function Questionnaire({ onComplete }) {
   }, [inviteCopied])
 
   useEffect(() => {
-    const parsed = readDualInviteFromSearch(QUESTIONS)
+    const parsed = readDualInviteFromSearch()
 
     if (parsed.status === 'ready') {
       const emptyAnswers = {}
       setSelectedMode('dual')
       setAnswers(emptyAnswers)
-      setDualAnswerSets([parsed.answers, emptyAnswers])
+      setDualAnswerSets([emptyAnswers, emptyAnswers])
       setActivePlayerIdx(1)
       setInviteLink('')
       setInviteCopied(false)
+      setInviteToken(parsed.token)
       setInviteError('')
       setEnteredFromInvite(true)
       setRevealCount(INITIAL_COUNT)
       setFocusedIdx(0)
       lastAnswerTimeRef.current = 0
       scrollLockRef.current = null
+      probeDualInvite(parsed.token)
+        .then((data) => {
+          if (data.status !== 'ready') {
+            const statusToReason = {
+              used: 'invite-used',
+              expired: 'invite-expired',
+              invalid: 'invite-invalid',
+            }
+            const message = INVITE_ERROR_COPY[statusToReason[data.status]] || '这份邀请链接暂时不可用，请让对方重新发起。'
+            setInviteError(message)
+            setSelectedMode(null)
+            setEnteredFromInvite(false)
+            setInviteToken('')
+          }
+        })
+        .catch((error) => {
+          const reason = error?.code || 'invite-invalid'
+          setInviteError(INVITE_ERROR_COPY[reason] || '这份邀请链接暂时不可用，请让对方重新发起。')
+          setSelectedMode(null)
+          setEnteredFromInvite(false)
+          setInviteToken('')
+        })
       window.history.replaceState({}, '', stripDualInviteFromUrl())
       setTimeout(() => {
         itemRefs.current[0]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -186,7 +214,9 @@ export default function Questionnaire({ onComplete }) {
     scrollLockRef.current = null
     setInviteLink('')
     setInviteCopied(false)
+    setInviteToken('')
     setEnteredFromInvite(false)
+    setInviteError('')
     setCompletionError('')
   }
 
@@ -248,17 +278,51 @@ export default function Questionnaire({ onComplete }) {
       setDualAnswerSets(nextSets)
 
       if (activePlayerIdx === 0) {
-        setTimeout(() => {
-          setInviteLink(createDualInviteLink(QUESTIONS, nextAnswers))
-          setRevealCount(INITIAL_COUNT)
-          setFocusedIdx(0)
-          lastAnswerTimeRef.current = 0
-          window.scrollTo({ top: 0, behavior: 'instant' })
-        }, 300)
+        setCompletionError('')
+        createDualInvite({
+          answersA: nextAnswers,
+          questionCount: QUESTIONS.length,
+          schemaVersion: 'v1',
+          ttlHours: 24,
+        })
+          .then((created) => {
+            setInviteToken(created.token)
+            setInviteLink(createDualInviteLink(created.token))
+            setRevealCount(INITIAL_COUNT)
+            setFocusedIdx(0)
+            lastAnswerTimeRef.current = 0
+            window.scrollTo({ top: 0, behavior: 'instant' })
+          })
+          .catch((error) => {
+            setCompletionError(error?.message || '邀请链接生成失败，请稍后重试。')
+          })
         return true
       }
 
-      setTimeout(() => onComplete({ mode: 'dual', answers: nextSets }), 300)
+      if (!inviteToken) {
+        setCompletionError('邀请链接状态异常，请让第一位重新发起双人拼图。')
+        return true
+      }
+
+      consumeDualInvite(inviteToken)
+        .then((consumed) => {
+          if (consumed.questionCount !== QUESTIONS.length) {
+            setCompletionError(INVITE_ERROR_COPY['question-count-mismatch'])
+            return
+          }
+          const mergedSets = [consumed.answersA || {}, nextAnswers]
+          setDualAnswerSets(mergedSets)
+          setTimeout(() => onComplete({ mode: 'dual', answers: mergedSets }), 300)
+        })
+        .catch((error) => {
+          const reason = error?.code || 'invite-invalid'
+          const message = INVITE_ERROR_COPY[reason] || '邀请链接已不可用，请让对方重新发起双人拼图。'
+          setCompletionError(message)
+          setInviteError(message)
+          setSelectedMode(null)
+          setEnteredFromInvite(false)
+          setInviteToken('')
+        })
       return true
     }
 

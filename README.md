@@ -47,8 +47,9 @@
 
 ### 2) 双人拼图机制
 
-- 第一位完成后生成邀请链接（携带压缩答案）
+- 第一位完成后生成一次性邀请链接（仅携带 `dualToken`）
 - 第二位通过链接进入并完成答题
+- 邀请链接默认 24 小时有效，成功提交后立即失效
 - 系统合成双方结果，输出：
   - 关系主类型
   - 双方各自视角类型
@@ -81,10 +82,14 @@ CPTI/
 ├─ api/                         # Vercel Serverless API（兼容层）
 │  ├─ _shared/
 │  │  └─ stats-helpers.js       # 统计聚合辅助函数、合法类型定义
+│  ├─ dual-invite-create.js     # 创建双人邀请 token（24h）
+│  ├─ dual-invite-consume.js    # 校验/消费双人邀请 token
 │  ├─ stats-submit.js           # 提交测评结果（写入 Supabase）
 │  └─ stats-summary.js          # 拉取统计汇总（读视图）
 ├─ functions/
 │  └─ api/                      # Cloudflare Pages Functions（兼容层）
+│     ├─ dual-invite-create.js
+│     ├─ dual-invite-consume.js
 │     ├─ stats-submit.js
 │     └─ stats-summary.js
 ├─ public/
@@ -110,7 +115,7 @@ CPTI/
 │  │  └─ typeImages.js          # 类型配图路径工具
 │  ├─ utils/
 │  │  ├─ scoring.js             # 计分、类型判定、单双人结果计算
-│  │  ├─ inviteCodec.js         # 双人邀请链接编码/解码
+│  │  ├─ inviteCodec.js         # 双人邀请 token 参数读写
 │  │  ├─ statsApi.js            # 统计 API 客户端请求
 │  │  └─ typeListing.js         # 类型列表简介生成
 │  ├─ App.jsx                   # 顶层视图切换与流程编排
@@ -119,7 +124,8 @@ CPTI/
 ├─ supabase/
 │  └─ stats_schema.sql          # Supabase 表、索引、RLS、统计视图
 ├─ server/
-│  └─ stats-service.js          # Vercel + Cloudflare 共用统计服务逻辑
+│  ├─ stats-service.js          # Vercel + Cloudflare 共用统计服务逻辑
+│  └─ invite-service.js         # 双人邀请令牌创建/校验/消费
 ├─ cpti_prd.md                  # 产品需求文档（权威）
 └─ README.md
 ```
@@ -252,7 +258,11 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
 - Vercel：使用 `api/` 下函数文件
 - Cloudflare Pages：使用 `functions/` 下函数文件
-- 前端始终请求统一路径：`/api/stats-submit` 与 `/api/stats-summary`
+- 前端始终请求统一路径：
+  - `/api/stats-submit`
+  - `/api/stats-summary`
+  - `/api/dual-invite-create`
+  - `/api/dual-invite-consume`
 
 ### 4) Supabase 初始化
 
@@ -263,6 +273,7 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 该 SQL 将创建：
 
 - `quiz_submissions` 数据表
+- `dual_invites` 一次性双人邀请令牌表
 - 必要索引
 - RLS 策略（禁用客户端直接访问该表）
 - `stats_summary_view` 聚合视图（供 API 查询）
@@ -307,11 +318,12 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
 常见场景：
 
-- 邀请 payload 版本不一致
-- 当前题库长度与邀请生成时不一致
-- 链接内容被截断
+- 链接已被第二位成功使用（一次性链接）
+- 链接超过 24 小时有效期
+- token 被篡改、截断或不存在
+- 当前题库长度与邀请生成时不一致（防错保护）
 
-对应处理逻辑在 `src/utils/inviteCodec.js` 与 `Questionnaire.jsx`。
+对应处理逻辑在 `src/utils/inviteCodec.js`、`src/components/Questionnaire.jsx` 与 `server/invite-service.js`。
 
 ---
 

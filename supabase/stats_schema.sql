@@ -30,11 +30,38 @@ create index if not exists idx_quiz_submissions_fingerprint_created_at
 create index if not exists idx_quiz_submissions_result_code
   on public.quiz_submissions (result_code);
 
+create table if not exists public.dual_invites (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default timezone('utc', now()),
+  token text not null unique,
+  answers_a jsonb not null,
+  question_count integer not null check (question_count > 0),
+  schema_version text not null default 'v1',
+  expires_at timestamptz not null,
+  used_at timestamptz,
+  used_by_fingerprint text
+);
+
+create index if not exists idx_dual_invites_expires_at
+  on public.dual_invites (expires_at);
+
+create index if not exists idx_dual_invites_used_at
+  on public.dual_invites (used_at);
+
 alter table public.quiz_submissions enable row level security;
+alter table public.dual_invites enable row level security;
 
 drop policy if exists quiz_submissions_no_client_access on public.quiz_submissions;
 create policy quiz_submissions_no_client_access
   on public.quiz_submissions
+  for all
+  to anon, authenticated
+  using (false)
+  with check (false);
+
+drop policy if exists dual_invites_no_client_access on public.dual_invites;
+create policy dual_invites_no_client_access
+  on public.dual_invites
   for all
   to anon, authenticated
   using (false)
