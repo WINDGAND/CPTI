@@ -560,8 +560,8 @@ export default function Questionnaire({ onComplete }) {
   return (
     <div>
       {resumeDraft && (
-        <div className="fixed inset-0 z-[70] bg-black/35 backdrop-blur-[1px] px-4">
-          <div className="mx-auto mt-[18vh] w-full max-w-md rounded-card border border-gray-100 bg-white p-5 shadow-xl">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/35 backdrop-blur-[1px] px-4">
+          <div className="w-full max-w-md rounded-card border border-gray-100 bg-white p-5 shadow-xl">
             <p className="text-base font-semibold text-base-text">检测到上次未完成作答</p>
             <p className="mt-2 text-sm leading-relaxed text-base-mute">
               你上次已完成 {resumeDraft.answeredCount} / {total} 题。可以继续上次进度，也可以重新开始。
@@ -587,8 +587,8 @@ export default function Questionnaire({ onComplete }) {
       )}
 
       {confirmDialog.open && (
-        <div className="fixed inset-0 z-[80] bg-black/40 px-4">
-          <div className="mx-auto mt-[22vh] w-full max-w-sm rounded-card border border-rose-100 bg-white p-5 shadow-xl">
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-sm rounded-card border border-rose-100 bg-white p-5 shadow-xl">
             <p className="text-base font-semibold text-base-text">确认重新开始？</p>
             <p className="mt-2 text-sm leading-relaxed text-base-mute">
               你当前已作答 {confirmDialog.count} 题，重新开始会清空已保存的作答记录。
