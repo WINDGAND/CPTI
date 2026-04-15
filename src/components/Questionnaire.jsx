@@ -112,6 +112,7 @@ export default function Questionnaire({ onComplete }) {
   const [resumeDraft, setResumeDraft] = useState(null)
   const [confirmDialog, setConfirmDialog] = useState({ open: false, source: '', count: 0 })
   const [player1Preview, setPlayer1Preview] = useState(null)
+  const [inviteCreateStatus, setInviteCreateStatus] = useState({ loading: false, error: '' })
   const [inviteGate, setInviteGate] = useState({ checking: false })
   const [inviteErrorModalOpen, setInviteErrorModalOpen] = useState(false)
   const [hydrationDone, setHydrationDone] = useState(false)
@@ -233,6 +234,7 @@ export default function Questionnaire({ onComplete }) {
     setInviteError('')
     setCompletionError('')
     setPlayer1Preview(null)
+    setInviteCreateStatus({ loading: false, error: '' })
   }
 
   function restoreFromDraft(draft) {
@@ -571,6 +573,7 @@ export default function Questionnaire({ onComplete }) {
         setCompletionError('')
         const preview = buildDualPlayer1Preview(nextAnswers)
         setPlayer1Preview(preview)
+        setInviteCreateStatus({ loading: true, error: '' })
         createDualInvite({
           answersA: nextAnswers,
           questionCount: QUESTIONS.length,
@@ -583,10 +586,13 @@ export default function Questionnaire({ onComplete }) {
             setRevealCount(INITIAL_COUNT)
             setFocusedIdx(0)
             lastAnswerTimeRef.current = 0
+            setInviteCreateStatus({ loading: false, error: '' })
             window.scrollTo({ top: 0, behavior: 'instant' })
           })
           .catch((error) => {
-            setCompletionError(error?.message || '邀请链接生成失败，请稍后重试。')
+            const message = error?.message || '邀请链接生成失败，请稍后重试。'
+            setCompletionError(message)
+            setInviteCreateStatus({ loading: false, error: message })
           })
         return true
       }
@@ -803,7 +809,7 @@ export default function Questionnaire({ onComplete }) {
       </div>
 
       <div className="mt-2">
-        {!enteredFromInvite && !modeChosen && initialInviteStatus !== 'ready' && (
+        {!enteredFromInvite && !modeChosen && answeredCount === 0 && initialInviteStatus !== 'ready' && (
           <motion.div
             ref={q0Ref}
             animate={{ opacity: isQ0Active || !modeChosen ? 1 : 0.35 }}
@@ -897,7 +903,7 @@ export default function Questionnaire({ onComplete }) {
           </div>
         )}
 
-        {selectedMode === 'dual' && inviteLink && activePlayerIdx === 0 && player1Preview && (
+        {selectedMode === 'dual' && activePlayerIdx === 0 && answeredCount === total && player1Preview && (
           <div className="max-w-xl mx-auto pt-6 pb-2 border-b border-gray-100">
             <div className="rounded-card border border-brand-purple/20 bg-white p-5 shadow-card">
               <div className="flex items-start justify-between gap-3">
@@ -940,8 +946,13 @@ export default function Questionnaire({ onComplete }) {
                   type="button"
                   className="btn-primary flex-1 py-3 text-sm"
                   onClick={handleCopyInviteLink}
+                  disabled={!inviteLink || inviteCreateStatus.loading}
                 >
-                  {inviteCopied ? '邀请链接已复制' : '复制邀请链接'}
+                  {inviteCreateStatus.loading
+                    ? '正在生成邀请链接...'
+                    : inviteCopied
+                      ? '邀请链接已复制'
+                      : '复制邀请链接'}
                 </button>
 
                 {typeof navigator !== 'undefined' && typeof navigator.share === 'function' && (
@@ -969,6 +980,12 @@ export default function Questionnaire({ onComplete }) {
                   </button>
                 )}
               </div>
+
+              {!inviteLink && inviteCreateStatus.error && (
+                <p className="mt-3 text-xs text-rose-600">
+                  {inviteCreateStatus.error}
+                </p>
+              )}
             </div>
           </div>
         )}
