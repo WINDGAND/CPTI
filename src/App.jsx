@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState } from 'react'
+import { Suspense, lazy, useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import AppShell from './components/layout/AppShell'
 import HomeStepCards from './components/home/HomeStepCards'
@@ -12,6 +12,7 @@ import { computeDualModeResult, computeSingleModeResult } from './utils/scoring'
 import { submitStats } from './utils/statsApi'
 import { preloadTypeImage } from './data/typeImages'
 import { clearQuizDraft } from './utils/quizDraft'
+import { readSingleShareFromSearch, stripSingleShareFromUrl } from './utils/inviteCodec'
 
 const ResultPoster = lazy(() => import('./components/ResultPoster'))
 const CoupleTypesPage = lazy(() => import('./components/types/CoupleTypesPage'))
@@ -82,6 +83,25 @@ export default function App() {
     onNavigateAbout: goAbout,
     onLogoHome: goQuizHome,
   }
+
+  useEffect(() => {
+    const parsed = readSingleShareFromSearch(QUESTIONS, window.location.search)
+    if (parsed.status !== 'ready') return
+
+    try {
+      const computed = computeSingleModeResult(QUESTIONS, parsed.answers, QUESTIONS_PER_DIMENSION)
+      setResultData(computed)
+      setLoadingMeta({
+        preloadTask: computed?.perception?.code ? preloadTypeImage(computed.perception.code) : Promise.resolve(),
+        minDurationMs: 500,
+      })
+      setView('loading')
+      window.history.replaceState({}, '', stripSingleShareFromUrl())
+      window.scrollTo({ top: 0, behavior: 'instant' })
+    } catch {
+      window.history.replaceState({}, '', stripSingleShareFromUrl())
+    }
+  }, [])
 
   // 答题完成 → 计算结果 → 进入 Loading
   function handleQuizComplete(payload) {

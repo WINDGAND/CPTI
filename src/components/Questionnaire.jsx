@@ -252,7 +252,6 @@ export default function Questionnaire({ onComplete }) {
     const parsed = readDualInviteFromSearch()
 
     if (parsed.status === 'ready') {
-      clearQuizDraft()
       setInviteGate({ checking: true })
       setInviteToken(parsed.token)
       probeDualInvite(parsed.token)

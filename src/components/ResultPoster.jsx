@@ -11,7 +11,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { DIMENSION_DETAILS, getResultByCode } from '../utils/scoring'
-import { createDualInviteLink, INVITE_SCHEMA_VERSION } from '../utils/inviteCodec'
+import { createDualInviteLink, createSingleShareLink, INVITE_SCHEMA_VERSION } from '../utils/inviteCodec'
 import { QUESTIONS } from '../data/questions'
 import { getTypeImageSources } from '../data/typeImages'
 import { recordImageMetric } from '../utils/imageMetrics'
@@ -172,6 +172,7 @@ export default function ResultPoster({ resultData, onRestart }) {
   const [nickname1, setNickname1] = useState('')
   const [nickname2, setNickname2] = useState('')
   const [inviteCopied, setInviteCopied] = useState(false)
+  const [shareCopied, setShareCopied] = useState(false)
   const [singleInviteLink, setSingleInviteLink] = useState('')
   const [singleInviteError, setSingleInviteError] = useState('')
   const [singleInviteLoading, setSingleInviteLoading] = useState(false)
@@ -197,6 +198,12 @@ export default function ResultPoster({ resultData, onRestart }) {
     const timer = setTimeout(() => setInviteCopied(false), 1500)
     return () => clearTimeout(timer)
   }, [inviteCopied])
+
+  useEffect(() => {
+    if (!shareCopied) return undefined
+    const timer = setTimeout(() => setShareCopied(false), 1500)
+    return () => clearTimeout(timer)
+  }, [shareCopied])
 
   function handleGenerate() {
     if (!isDualMode && !canGenerateSinglePoster) return
@@ -237,6 +244,29 @@ export default function ResultPoster({ resultData, onRestart }) {
     } catch {
       window.prompt('复制下面的双人拼图链接', link)
       setInviteCopied(true)
+    }
+  }
+
+  async function handleCopySingleShareLink() {
+    if (isDualMode || !perception?.sourceAnswers) return
+    let link = ''
+    try {
+      link = createSingleShareLink(QUESTIONS, perception.sourceAnswers)
+    } catch {
+      setSingleInviteError('单人链接生成失败，请稍后重试。')
+      return
+    }
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(link)
+      } else {
+        window.prompt('复制下面的单人结果链接', link)
+      }
+      setShareCopied(true)
+    } catch {
+      window.prompt('复制下面的单人结果链接', link)
+      setShareCopied(true)
     }
   }
 
@@ -668,6 +698,18 @@ export default function ResultPoster({ resultData, onRestart }) {
                 type="button"
                 className={[
                   'flex-1 py-3 rounded-btn text-sm font-semibold transition-all duration-150',
+                  shareCopied
+                    ? 'bg-brand-green text-white border border-brand-green shadow-sm'
+                    : 'btn-ghost',
+                ].join(' ')}
+                onClick={handleCopySingleShareLink}
+              >
+                {shareCopied ? '单人链接已复制' : '复制单人结果链接'}
+              </button>
+              <button
+                type="button"
+                className={[
+                  'flex-1 py-3 rounded-btn text-sm font-semibold transition-all duration-150',
                   inviteCopied
                     ? 'bg-brand-green text-white border border-brand-green shadow-sm'
                     : 'btn-primary',
@@ -696,7 +738,11 @@ export default function ResultPoster({ resultData, onRestart }) {
               <p className="mt-2 text-xs text-rose-600">{singleInviteError}</p>
             )}
             <p className="mt-2 text-xs text-green-600 min-h-[1.25rem]">
-              {inviteCopied ? '已复制，可直接发给 TA' : ' '}
+              {inviteCopied
+                ? '双人链接已复制，可直接发给 TA'
+                : shareCopied
+                  ? '单人结果链接可反复打开/分享'
+                  : ' '}
             </p>
           </div>
         )}
