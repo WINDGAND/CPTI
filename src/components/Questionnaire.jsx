@@ -71,6 +71,8 @@ export default function Questionnaire({ onComplete }) {
   const [completionError, setCompletionError] = useState('')
   const [resumeDraft, setResumeDraft] = useState(null)
   const [confirmDialog, setConfirmDialog] = useState({ open: false, source: '', count: 0 })
+  const [inviteGate, setInviteGate] = useState({ checking: false })
+  const [inviteErrorModalOpen, setInviteErrorModalOpen] = useState(false)
   const [hydrationDone, setHydrationDone] = useState(false)
   const [focusedIdx, setFocusedIdx] = useState(0)
   const [revealCount, setRevealCount] = useState(INITIAL_COUNT)
@@ -222,58 +224,75 @@ export default function Questionnaire({ onComplete }) {
     setConfirmDialog({ open: false, source: '', count: 0 })
   }
 
+  function closeInviteErrorModal() {
+    setInviteErrorModalOpen(false)
+  }
+
+  function enterSecondPlayerByInvite(token) {
+    const emptyAnswers = {}
+    setSelectedMode('dual')
+    setAnswers(emptyAnswers)
+    setDualAnswerSets([emptyAnswers, emptyAnswers])
+    setActivePlayerIdx(1)
+    setInviteLink('')
+    setInviteCopied(false)
+    setInviteToken(token)
+    setInviteError('')
+    setEnteredFromInvite(true)
+    setRevealCount(INITIAL_COUNT)
+    setFocusedIdx(0)
+    lastAnswerTimeRef.current = 0
+    scrollLockRef.current = null
+    setTimeout(() => {
+      itemRefs.current[0]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 200)
+  }
+
   useEffect(() => {
     const parsed = readDualInviteFromSearch()
 
     if (parsed.status === 'ready') {
       clearQuizDraft()
-      const emptyAnswers = {}
-      setSelectedMode('dual')
-      setAnswers(emptyAnswers)
-      setDualAnswerSets([emptyAnswers, emptyAnswers])
-      setActivePlayerIdx(1)
-      setInviteLink('')
-      setInviteCopied(false)
+      setInviteGate({ checking: true })
       setInviteToken(parsed.token)
-      setInviteError('')
-      setEnteredFromInvite(true)
-      setRevealCount(INITIAL_COUNT)
-      setFocusedIdx(0)
-      lastAnswerTimeRef.current = 0
-      scrollLockRef.current = null
       probeDualInvite(parsed.token)
         .then((data) => {
-          if (data.status !== 'ready') {
-            const statusToReason = {
-              used: 'invite-used',
-              expired: 'invite-expired',
-              invalid: 'invite-invalid',
-            }
-            const message = INVITE_ERROR_COPY[statusToReason[data.status]] || '这份邀请链接暂时不可用，请让对方重新发起。'
-            setInviteError(message)
-            setSelectedMode(null)
-            setEnteredFromInvite(false)
-            setInviteToken('')
+          setInviteGate({ checking: false })
+          if (data.status === 'ready') {
+            enterSecondPlayerByInvite(parsed.token)
+            return
           }
+
+          const statusToReason = {
+            used: 'invite-used',
+            expired: 'invite-expired',
+            invalid: 'invite-invalid',
+          }
+          const message = INVITE_ERROR_COPY[statusToReason[data.status]] || '这份邀请链接暂时不可用，请让对方重新发起。'
+          setInviteError(message)
+          setInviteErrorModalOpen(true)
+          setInviteToken('')
+          resetToEntry()
         })
         .catch((error) => {
+          setInviteGate({ checking: false })
           const reason = error?.code || 'invite-invalid'
-          setInviteError(INVITE_ERROR_COPY[reason] || '这份邀请链接暂时不可用，请让对方重新发起。')
-          setSelectedMode(null)
-          setEnteredFromInvite(false)
+          const message = INVITE_ERROR_COPY[reason] || '这份邀请链接暂时不可用，请让对方重新发起。'
+          setInviteError(message)
+          setInviteErrorModalOpen(true)
           setInviteToken('')
+          resetToEntry()
         })
       window.history.replaceState({}, '', stripDualInviteFromUrl())
-      setTimeout(() => {
-        itemRefs.current[0]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      }, 200)
       setHydrationDone(true)
       return
     }
 
     if (parsed.status === 'invalid') {
       const fallbackMessage = '这份邀请链接无法识别，请让对方重新生成一份新的双人拼图链接。'
-      setInviteError(INVITE_ERROR_COPY[parsed.reason] ?? fallbackMessage)
+      const message = INVITE_ERROR_COPY[parsed.reason] ?? fallbackMessage
+      setInviteError(message)
+      setInviteErrorModalOpen(true)
       window.history.replaceState({}, '', stripDualInviteFromUrl())
     }
 
@@ -607,6 +626,35 @@ export default function Questionnaire({ onComplete }) {
                 onClick={handleConfirmRestart}
               >
                 确认重开
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {inviteGate.checking && (
+        <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/20 px-4">
+          <div className="w-full max-w-sm rounded-card border border-gray-100 bg-white p-5 shadow-xl">
+            <p className="text-base font-semibold text-base-text">正在校验邀请链接…</p>
+            <p className="mt-2 text-sm leading-relaxed text-base-mute">
+              请稍等片刻，我们在确认这条双人链接是否仍然有效。
+            </p>
+          </div>
+        </div>
+      )}
+
+      {inviteErrorModalOpen && inviteError && (
+        <div className="fixed inset-0 z-[85] flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-sm rounded-card border border-amber-200 bg-white p-5 shadow-xl">
+            <p className="text-base font-semibold text-base-text">邀请链接不可用</p>
+            <p className="mt-2 text-sm leading-relaxed text-base-mute">{inviteError}</p>
+            <div className="mt-5">
+              <button
+                type="button"
+                className="btn-primary w-full py-2.5 text-sm"
+                onClick={closeInviteErrorModal}
+              >
+                我知道了
               </button>
             </div>
           </div>
