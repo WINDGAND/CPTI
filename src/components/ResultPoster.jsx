@@ -192,6 +192,14 @@ export default function ResultPoster({ resultData, onRestart }) {
   const n1 = nickname1.trim() || 'TA'
   const n2 = nickname2.trim() || '你'
   const canGenerateSinglePoster = nickname2.trim().length > 0
+  const fromDualPreview = (() => {
+    if (typeof window === 'undefined') return false
+    try {
+      return new URLSearchParams(window.location.search).get('fromDualPreview') === '1'
+    } catch {
+      return false
+    }
+  })()
 
   useEffect(() => {
     if (!inviteCopied) return undefined
@@ -272,6 +280,14 @@ export default function ResultPoster({ resultData, onRestart }) {
 
   return (
     <div className="w-full max-w-none mx-auto pb-16">
+      {!isDualMode && fromDualPreview && (
+        <div className="mb-6 rounded-card border border-amber-200 bg-amber-50 px-4 py-3">
+          <p className="text-sm font-semibold text-amber-800">这是“你的视角”完整报告（非双人合成结果）</p>
+          <p className="mt-1 text-xs leading-relaxed text-amber-800/90">
+            双人模式的最终 Couple Type 需要 TA 完成作答后合成。你仍可以回到上一页复制邀请链接继续拼图。
+          </p>
+        </div>
+      )}
 
       {/* ══════════════════════════════════════════════
           海报主体（供 html2canvas 截图）

@@ -102,6 +102,7 @@ export function readQuizDraft(questions) {
         inviteToken: typeof parsed?.inviteToken === 'string' ? parsed.inviteToken : '',
         inviteLink: typeof parsed?.inviteLink === 'string' ? parsed.inviteLink : '',
         enteredFromInvite: Boolean(parsed?.enteredFromInvite),
+        dualPlayer1Preview: isPlainObject(parsed?.dualPlayer1Preview) ? parsed.dualPlayer1Preview : null,
         updatedAt: new Date(updatedAt).toISOString(),
       },
     }
@@ -125,6 +126,7 @@ export function saveQuizDraft(questions, draftState) {
     inviteToken: String(draftState.inviteToken || ''),
     inviteLink: String(draftState.inviteLink || ''),
     enteredFromInvite: Boolean(draftState.enteredFromInvite),
+    dualPlayer1Preview: isPlainObject(draftState.dualPlayer1Preview) ? draftState.dualPlayer1Preview : null,
     updatedAt: new Date().toISOString(),
   }
 

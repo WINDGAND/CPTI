@@ -1,14 +1,16 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import LikertScale from './LikertScale'
-import { QUESTION_MODE_COPY, QUESTIONS, getQuestionPrompt } from '../data/questions'
+import { QUESTION_MODE_COPY, QUESTIONS, QUESTIONS_PER_DIMENSION, getQuestionPrompt } from '../data/questions'
 import {
   createDualInviteLink,
+  createSingleShareLink,
   readDualInviteFromSearch,
   stripDualInviteFromUrl,
 } from '../utils/inviteCodec'
 import { consumeDualInvite, createDualInvite, probeDualInvite } from '../utils/statsApi'
 import { clearQuizDraft, readQuizDraft, saveQuizDraft } from '../utils/quizDraft'
+import { computeSingleModeResult, DIMENSION_DETAILS } from '../utils/scoring'
 
 const INITIAL_COUNT = 6
 const LOAD_STEP     = 6          // 每次多加载 6 题，减少触发次数
@@ -45,6 +47,44 @@ function getRevealCountByAnswers(answers, total) {
   return Math.min(total, Math.max(INITIAL_COUNT, maxAnsweredIdx + 1))
 }
 
+const DIMENSION_ROWS = Object.values(DIMENSION_DETAILS)
+
+function renderPreviewSpectrum(percentages) {
+  return (
+    <div className="space-y-3">
+      {DIMENSION_ROWS.map(({ posKey, negKey, posLabel, negLabel, title }) => {
+        const posVal = percentages?.[posKey] ?? 50
+        const negVal = percentages?.[negKey] ?? 50
+        return (
+          <div key={posKey} className="space-y-1">
+            <div className="text-[11px] text-base-mute font-medium">{title}</div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold w-9 text-right shrink-0 text-brand-purple">
+                {posLabel}
+              </span>
+              <div className="flex-1 h-2 rounded-full bg-gray-100 overflow-hidden min-w-0">
+                <motion.div
+                  className="h-full rounded-full bg-brand-purple"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${posVal}%` }}
+                  transition={{ duration: 0.6, ease: 'easeOut' }}
+                />
+              </div>
+              <span className="text-[11px] font-medium w-9 shrink-0 text-base-mute">
+                {negLabel}
+              </span>
+            </div>
+            <div className="flex justify-between text-[10px] text-base-mute/70 px-[40px]">
+              <span>{posVal}%</span>
+              <span>{negVal}%</span>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 /**
  * Questionnaire — 完整答题流程（PRD 3.2.1 / 3.1）
  *
@@ -71,6 +111,7 @@ export default function Questionnaire({ onComplete }) {
   const [completionError, setCompletionError] = useState('')
   const [resumeDraft, setResumeDraft] = useState(null)
   const [confirmDialog, setConfirmDialog] = useState({ open: false, source: '', count: 0 })
+  const [player1Preview, setPlayer1Preview] = useState(null)
   const [inviteGate, setInviteGate] = useState({ checking: false })
   const [inviteErrorModalOpen, setInviteErrorModalOpen] = useState(false)
   const [hydrationDone, setHydrationDone] = useState(false)
@@ -191,6 +232,7 @@ export default function Questionnaire({ onComplete }) {
     setEnteredFromInvite(false)
     setInviteError('')
     setCompletionError('')
+    setPlayer1Preview(null)
   }
 
   function restoreFromDraft(draft) {
@@ -308,6 +350,10 @@ export default function Questionnaire({ onComplete }) {
       }
     }
 
+    if (draftResult.status === 'ready' && draftResult.draft?.dualPlayer1Preview) {
+      setPlayer1Preview(draftResult.draft.dualPlayer1Preview)
+    }
+
     setHydrationDone(true)
   }, [])
 
@@ -335,6 +381,7 @@ export default function Questionnaire({ onComplete }) {
         inviteToken,
         inviteLink,
         enteredFromInvite,
+        dualPlayer1Preview: player1Preview,
       })
     }, DRAFT_SAVE_DEBOUNCE_MS)
 
@@ -350,7 +397,49 @@ export default function Questionnaire({ onComplete }) {
     inviteToken,
     inviteLink,
     enteredFromInvite,
+    player1Preview,
   ])
+
+  function buildDualPlayer1Preview(nextAnswers) {
+    const computed = computeSingleModeResult(QUESTIONS, nextAnswers, QUESTIONS_PER_DIMENSION)
+    const perception = computed?.perception
+    const code = perception?.code || ''
+    const title = perception?.result?.title || ''
+    const percentages = perception?.percentages || {}
+    const summary = Array.isArray(perception?.result?.description) ? (perception.result.description[0] || '') : ''
+    const singleShareLink = (() => {
+      try {
+        const link = createSingleShareLink(QUESTIONS, nextAnswers)
+        const url = new URL(link)
+        url.searchParams.set('fromDualPreview', '1')
+        return url.toString()
+      } catch {
+        return ''
+      }
+    })()
+
+    return {
+      code,
+      title,
+      percentages,
+      summary,
+      singleShareLink,
+    }
+  }
+
+  async function handleShareInviteLink() {
+    if (!inviteLink) return
+    if (!navigator.share) return
+    try {
+      await navigator.share({
+        title: 'CPTI 双人拼图邀请',
+        text: '我刚完成了第一位作答，点开链接一起拼出我们的 Couple Type～',
+        url: inviteLink,
+      })
+    } catch {
+      // ignore user cancel
+    }
+  }
 
   // ── 选择模式（第0题） ──────────────────────────────────────
   function resetForModeStart(mode) {
@@ -480,6 +569,8 @@ export default function Questionnaire({ onComplete }) {
 
       if (activePlayerIdx === 0) {
         setCompletionError('')
+        const preview = buildDualPlayer1Preview(nextAnswers)
+        setPlayer1Preview(preview)
         createDualInvite({
           answersA: nextAnswers,
           questionCount: QUESTIONS.length,
@@ -802,6 +893,82 @@ export default function Questionnaire({ onComplete }) {
                   你是通过邀请链接进入的第二位作答者。请按你的真实感受完成答题，系统会在你提交后合成最终 Couple Type。
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {selectedMode === 'dual' && inviteLink && activePlayerIdx === 0 && player1Preview && (
+          <div className="max-w-xl mx-auto pt-6 pb-2 border-b border-gray-100">
+            <div className="rounded-card border border-brand-purple/20 bg-white p-5 shadow-card">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold tracking-wide text-brand-purple">你的视角预览</p>
+                  <p className="mt-1 text-base font-semibold text-base-text">
+                    你的视角预览（非最终 Couple Type）
+                  </p>
+                </div>
+                <span className="shrink-0 rounded-full bg-brand-purple/10 px-2.5 py-1 text-[11px] font-semibold text-brand-purple">
+                  还差一步
+                </span>
+              </div>
+
+              <p className="mt-2 text-sm leading-relaxed text-base-mute">
+                这是你此刻对关系的主观感知版本。最终合成结果要等 TA 完成后生成：会展示你们的合成类型与一致/错位维度。
+              </p>
+
+              <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50/80 px-4 py-3">
+                <div className="flex items-end justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-2xl font-black tracking-wide text-base-text">{player1Preview.code || '--'}</p>
+                    <p className="text-sm font-semibold text-base-text truncate">{player1Preview.title || '你的感知类型'}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[11px] font-semibold text-base-mute">预览摘要</p>
+                    <p className="mt-1 text-xs leading-relaxed text-base-mute max-w-[14rem]">
+                      {(player1Preview.summary || '').slice(0, 40) || '完成双人拼图后可查看完整双人报告。'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                {renderPreviewSpectrum(player1Preview.percentages)}
+              </div>
+
+              <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+                <button
+                  type="button"
+                  className="btn-primary flex-1 py-3 text-sm"
+                  onClick={handleCopyInviteLink}
+                >
+                  {inviteCopied ? '邀请链接已复制' : '复制邀请链接'}
+                </button>
+
+                {typeof navigator !== 'undefined' && typeof navigator.share === 'function' && (
+                  <button
+                    type="button"
+                    className="btn-ghost flex-1 py-3 text-sm"
+                    onClick={handleShareInviteLink}
+                  >
+                    一键发给 TA
+                  </button>
+                )}
+              </div>
+
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <p className="text-xs text-base-mute">
+                  链接一次性 · 24小时有效 · TA 提交后自动生成双人报告
+                </p>
+                {player1Preview.singleShareLink && (
+                  <button
+                    type="button"
+                    className="text-xs font-semibold text-brand-purple underline underline-offset-4"
+                    onClick={() => window.open(player1Preview.singleShareLink, '_blank', 'noreferrer')}
+                  >
+                    查看完整单人报告（可选）
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         )}
