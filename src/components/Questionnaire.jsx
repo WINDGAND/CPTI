@@ -269,19 +269,19 @@ export default function Questionnaire({ onComplete }) {
             invalid: 'invite-invalid',
           }
           const message = INVITE_ERROR_COPY[statusToReason[data.status]] || '这份邀请链接暂时不可用，请让对方重新发起。'
+          resetToEntry()
           setInviteError(message)
           setInviteErrorModalOpen(true)
           setInviteToken('')
-          resetToEntry()
         })
         .catch((error) => {
           setInviteGate({ checking: false })
           const reason = error?.code || 'invite-invalid'
           const message = INVITE_ERROR_COPY[reason] || '这份邀请链接暂时不可用，请让对方重新发起。'
+          resetToEntry()
           setInviteError(message)
           setInviteErrorModalOpen(true)
           setInviteToken('')
-          resetToEntry()
         })
       window.history.replaceState({}, '', stripDualInviteFromUrl())
       setHydrationDone(true)
