@@ -713,7 +713,7 @@ export default function Questionnaire({ onComplete }) {
       </div>
 
       <div className="mt-2">
-        {!enteredFromInvite && !(initialInviteStatus === 'ready' && selectedMode === 'dual') && (
+        {!enteredFromInvite && !modeChosen && initialInviteStatus !== 'ready' && (
           <motion.div
             ref={q0Ref}
             animate={{ opacity: isQ0Active || !modeChosen ? 1 : 0.35 }}
