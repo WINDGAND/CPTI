@@ -48,8 +48,86 @@ create index if not exists idx_dual_invites_expires_at
 create index if not exists idx_dual_invites_used_at
   on public.dual_invites (used_at);
 
+-- ─────────────────────────────────────────────────────────────
+-- Anonymous telemetry aggregates (no per-user answer storage)
+-- ─────────────────────────────────────────────────────────────
+
+create table if not exists public.telemetry_submissions (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default timezone('utc', now()),
+  mode text not null,
+  fingerprint_hash text not null,
+  constraint telemetry_submissions_mode_check check (mode in ('single', 'dual'))
+);
+
+create index if not exists idx_telemetry_submissions_fingerprint_created_at
+  on public.telemetry_submissions (fingerprint_hash, created_at desc);
+
+create table if not exists public.quiz_question_choice_agg (
+  day date not null,
+  mode text not null,
+  question_id text not null,
+  selected_index smallint not null check (selected_index between 0 and 6),
+  count bigint not null default 0,
+  constraint quiz_question_choice_agg_mode_check check (mode in ('single', 'dual')),
+  primary key (day, mode, question_id, selected_index)
+);
+
+create index if not exists idx_quiz_question_choice_agg_day
+  on public.quiz_question_choice_agg (day desc);
+
+create table if not exists public.quiz_dimension_score_agg (
+  day date not null,
+  mode text not null,
+  dimension text not null,
+  score smallint not null,
+  count bigint not null default 0,
+  constraint quiz_dimension_score_agg_mode_check check (mode in ('single', 'dual')),
+  constraint quiz_dimension_score_agg_dimension_check check (dimension in ('SI', 'RP', 'OF', 'DA')),
+  primary key (day, mode, dimension, score)
+);
+
+create index if not exists idx_quiz_dimension_score_agg_day
+  on public.quiz_dimension_score_agg (day desc);
+
+-- RPC helpers: atomic +1 increments via UPSERT
+create or replace function public.increment_question_choice_agg(
+  p_day date,
+  p_mode text,
+  p_question_id text,
+  p_selected_index int,
+  p_delta int default 1
+)
+returns void
+language sql
+as $$
+  insert into public.quiz_question_choice_agg(day, mode, question_id, selected_index, count)
+  values (p_day, p_mode, p_question_id, p_selected_index, p_delta)
+  on conflict (day, mode, question_id, selected_index)
+  do update set count = public.quiz_question_choice_agg.count + excluded.count;
+$$;
+
+create or replace function public.increment_dimension_score_agg(
+  p_day date,
+  p_mode text,
+  p_dimension text,
+  p_score int,
+  p_delta int default 1
+)
+returns void
+language sql
+as $$
+  insert into public.quiz_dimension_score_agg(day, mode, dimension, score, count)
+  values (p_day, p_mode, p_dimension, p_score, p_delta)
+  on conflict (day, mode, dimension, score)
+  do update set count = public.quiz_dimension_score_agg.count + excluded.count;
+$$;
+
 alter table public.quiz_submissions enable row level security;
 alter table public.dual_invites enable row level security;
+alter table public.telemetry_submissions enable row level security;
+alter table public.quiz_question_choice_agg enable row level security;
+alter table public.quiz_dimension_score_agg enable row level security;
 
 drop policy if exists quiz_submissions_no_client_access on public.quiz_submissions;
 create policy quiz_submissions_no_client_access
@@ -62,6 +140,30 @@ create policy quiz_submissions_no_client_access
 drop policy if exists dual_invites_no_client_access on public.dual_invites;
 create policy dual_invites_no_client_access
   on public.dual_invites
+  for all
+  to anon, authenticated
+  using (false)
+  with check (false);
+
+drop policy if exists telemetry_submissions_no_client_access on public.telemetry_submissions;
+create policy telemetry_submissions_no_client_access
+  on public.telemetry_submissions
+  for all
+  to anon, authenticated
+  using (false)
+  with check (false);
+
+drop policy if exists quiz_question_choice_agg_no_client_access on public.quiz_question_choice_agg;
+create policy quiz_question_choice_agg_no_client_access
+  on public.quiz_question_choice_agg
+  for all
+  to anon, authenticated
+  using (false)
+  with check (false);
+
+drop policy if exists quiz_dimension_score_agg_no_client_access on public.quiz_dimension_score_agg;
+create policy quiz_dimension_score_agg_no_client_access
+  on public.quiz_dimension_score_agg
   for all
   to anon, authenticated
   using (false)

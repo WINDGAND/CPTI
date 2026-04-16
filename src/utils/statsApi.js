@@ -43,6 +43,27 @@ export async function submitStats(resultCode, mode) {
   }
 }
 
+export async function submitTelemetry({ mode, questionCount, answers, dimensionScores }) {
+  if (!mode || !questionCount || !answers || !dimensionScores) return
+
+  const response = await fetch('/api/telemetry-submit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      mode,
+      questionCount,
+      answers,
+      dimensionScores,
+    }),
+    keepalive: true,
+  })
+
+  const payload = await parseJsonSafely(response)
+  if (!response.ok || !payload?.ok) {
+    throw new Error(payload?.error || 'Failed to submit telemetry')
+  }
+}
+
 export async function createDualInvite({ answersA, questionCount, schemaVersion, ttlHours = 24 }) {
   const response = await fetch('/api/dual-invite-create', {
     method: 'POST',

@@ -85,12 +85,14 @@ CPTI/
 │  ├─ dual-invite-create.js     # 创建双人邀请 token（24h）
 │  ├─ dual-invite-consume.js    # 校验/消费双人邀请 token
 │  ├─ stats-submit.js           # 提交测评结果（写入 Supabase）
+│  ├─ telemetry-submit.js       # 匿名埋点（每题分布/每维得分聚合）
 │  └─ stats-summary.js          # 拉取统计汇总（读视图）
 ├─ functions/
 │  └─ api/                      # Cloudflare Pages Functions（兼容层）
 │     ├─ dual-invite-create.js
 │     ├─ dual-invite-consume.js
 │     ├─ stats-submit.js
+│     ├─ telemetry-submit.js
 │     └─ stats-summary.js
 ├─ public/
 │  ├─ logo.png
@@ -126,6 +128,7 @@ CPTI/
 ├─ server/
 │  ├─ stats-service.js          # Vercel + Cloudflare 共用统计服务逻辑
 │  └─ invite-service.js         # 双人邀请令牌创建/校验/消费
+│  └─ telemetry-service.js      # 匿名埋点聚合写入逻辑
 ├─ cpti_prd.md                  # 产品需求文档（权威）
 └─ README.md
 ```
@@ -223,6 +226,30 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 - 基于 IP + UA 的 hash 做窗口限流（15 分钟最多 3 次）
 - 写入 `quiz_submissions` 表
 
+### 匿名埋点接口：`POST /api/telemetry-submit`
+
+用途：用于分析题库与量表是否存在系统性偏置（例如某维度长期偏正/偏负、某些题大量“极端同意”）。
+
+请求体（匿名，不包含昵称/结果文案等）：
+
+```json
+{
+  "mode": "single",
+  "questionCount": 32,
+  "answers": { "SI-1": 0, "DA-1": 3 },
+  "dimensionScores": { "SI": 12, "RP": 4, "OF": -3, "DA": 9 }
+}
+```
+
+特性：
+
+- 基于 IP + UA hash 做窗口限流（15 分钟最多 3 次）
+- 不存储单个用户答案表，只写“按天聚合计数”
+- 写入/更新：
+  - `telemetry_submissions`（仅用于限流）
+  - `quiz_question_choice_agg`（每题 0-6 档位分布）
+  - `quiz_dimension_score_agg`（四维原始得分分布）
+
 ### 汇总接口：`GET /api/stats-summary`
 
 流程：
@@ -274,6 +301,7 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
 - `quiz_submissions` 数据表
 - `dual_invites` 一次性双人邀请令牌表
+- 匿名埋点相关表与 RPC（用于题库分析与偏差诊断）
 - 必要索引
 - RLS 策略（禁用客户端直接访问该表）
 - `stats_summary_view` 聚合视图（供 API 查询）

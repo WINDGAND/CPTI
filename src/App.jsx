@@ -9,7 +9,7 @@ import AboutPage from './components/about/AboutPage'
 import StatsPage from './components/stats/StatsPage'
 import { QUESTIONS, QUESTIONS_PER_DIMENSION } from './data/questions'
 import { computeDualModeResult, computeSingleModeResult } from './utils/scoring'
-import { submitStats } from './utils/statsApi'
+import { submitStats, submitTelemetry } from './utils/statsApi'
 import { preloadTypeImage } from './data/typeImages'
 import { clearQuizDraft } from './utils/quizDraft'
 import { readSingleShareFromSearch, stripSingleShareFromUrl } from './utils/inviteCodec'
@@ -115,6 +115,35 @@ export default function App() {
       : computed.perception?.code
     if (resultCode) {
       submitStats(resultCode, payload.mode).catch(() => {})
+    }
+
+    if (payload.mode === 'dual') {
+      const [answersA = {}, answersB = {}] = Array.isArray(payload.answers) ? payload.answers : []
+      const playerA = computed.players?.[0]
+      const playerB = computed.players?.[1]
+      if (playerA?.dimensionScores && answersA) {
+        submitTelemetry({
+          mode: 'dual',
+          questionCount: QUESTIONS.length,
+          answers: answersA,
+          dimensionScores: playerA.dimensionScores,
+        }).catch(() => {})
+      }
+      if (playerB?.dimensionScores && answersB) {
+        submitTelemetry({
+          mode: 'dual',
+          questionCount: QUESTIONS.length,
+          answers: answersB,
+          dimensionScores: playerB.dimensionScores,
+        }).catch(() => {})
+      }
+    } else if (computed?.perception?.dimensionScores && payload.answers) {
+      submitTelemetry({
+        mode: 'single',
+        questionCount: QUESTIONS.length,
+        answers: payload.answers,
+        dimensionScores: computed.perception.dimensionScores,
+      }).catch(() => {})
     }
 
     const preloadTask = resultCode
