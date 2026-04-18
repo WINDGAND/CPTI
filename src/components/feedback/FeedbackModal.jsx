@@ -56,7 +56,8 @@ export default function FeedbackModal({ open, onClose }) {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.18 }}
-          className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center bg-black/40 px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:pb-4"
+          className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center bg-black/40 px-4"
+          style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
           onClick={(e) => { if (e.target === e.currentTarget) handleClose() }}
         >
           <motion.div
@@ -65,10 +66,11 @@ export default function FeedbackModal({ open, onClose }) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 16 }}
             transition={{ duration: 0.22, ease: 'easeOut' }}
-            className="w-full max-w-sm rounded-card border border-gray-100 bg-white shadow-xl"
+            className="w-full max-w-sm rounded-card border border-gray-100 bg-white shadow-xl flex flex-col"
+            style={{ maxHeight: 'min(90dvh, 520px)' }}
           >
-            {/* 标题行 */}
-            <div className="flex items-center justify-between px-5 pt-5 pb-1">
+            {/* 标题行（固定不随滚动消失） */}
+            <div className="flex shrink-0 items-center justify-between px-5 pt-5 pb-1">
               <h2 className="text-base font-semibold text-base-text">问题反馈</h2>
               <button
                 type="button"
@@ -82,7 +84,7 @@ export default function FeedbackModal({ open, onClose }) {
             </div>
 
             {status === 'success' ? (
-              <div className="flex flex-col items-center gap-3 px-5 pt-6 pb-7 text-center">
+              <div className="flex flex-col items-center gap-3 px-5 pt-6 pb-7 text-center overflow-y-auto">
                 <CheckCircle size={40} className="text-brand-cyan" />
                 <p className="text-sm font-semibold text-base-text">感谢你的反馈！</p>
                 <p className="text-xs text-base-mute leading-relaxed">
@@ -97,7 +99,7 @@ export default function FeedbackModal({ open, onClose }) {
                 </button>
               </div>
             ) : (
-              <form onSubmit={handleSubmit} className="px-5 pt-3 pb-5 space-y-4">
+              <form onSubmit={handleSubmit} className="px-5 pt-3 pb-5 space-y-3 overflow-y-auto">
                 <p className="text-xs leading-relaxed text-base-mute">
                   遇到 bug、体验问题，或有任何建议？欢迎告诉我们。
                 </p>
@@ -108,7 +110,7 @@ export default function FeedbackModal({ open, onClose }) {
                     value={body}
                     onChange={(e) => setBody(e.target.value.slice(0, MAX_LEN))}
                     placeholder="请描述你遇到的问题或建议..."
-                    rows={5}
+                    rows={4}
                     className="w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-base-text placeholder:text-gray-400 focus:border-brand-cyan focus:outline-none focus:ring-1 focus:ring-brand-cyan transition-colors"
                     disabled={status === 'submitting'}
                     required
@@ -125,7 +127,7 @@ export default function FeedbackModal({ open, onClose }) {
                   </p>
                 )}
 
-                <div className="flex gap-2 pt-1">
+                <div className="flex gap-2 pt-1 shrink-0">
                   <button
                     type="button"
                     onClick={handleClose}

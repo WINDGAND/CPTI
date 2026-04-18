@@ -82,10 +82,11 @@ export default function Header({
         <button
           type="button"
           onClick={openFeedback}
-          className="md:hidden ml-2 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-base-mute hover:text-brand-cyan hover:bg-brand-cyan/10 transition-colors"
+          className="md:hidden ml-2 inline-flex h-9 shrink-0 items-center gap-1 px-2 rounded-full text-base-mute hover:text-brand-cyan hover:bg-brand-cyan/10 transition-colors"
           aria-label="问题反馈"
         >
-          <MessageSquarePlus size={20} />
+          <MessageSquarePlus size={17} />
+          <span className="text-xs font-medium leading-none">反馈</span>
         </button>
 
         {/* ── 桌面端居中导航 ── */}
