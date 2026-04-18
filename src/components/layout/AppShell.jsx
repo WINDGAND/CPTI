@@ -1,4 +1,6 @@
+import { MessageSquarePlus } from 'lucide-react'
 import Header from './Header'
+import { useFeedback } from '../feedback/FeedbackContext'
 
 /**
  * AppShell — 全站页面外壳
@@ -11,6 +13,7 @@ import Header from './Header'
 export default function AppShell({ children, headerNav, contentSurface = 'muted', contentWidth = 'default' }) {
   const whitePage = contentSurface === 'white'
   const wide = contentWidth === 'wide'
+  const { openFeedback } = useFeedback()
 
   return (
     <div className={whitePage ? 'min-h-screen bg-base-card' : 'min-h-screen bg-base-bg'}>
@@ -23,6 +26,19 @@ export default function AppShell({ children, headerNav, contentSurface = 'muted'
           whitePage ? 'bg-base-card pt-0 md:pt-0' : 'pt-5 md:pt-8',
         ].join(' ')}
       >
+        {/* 桌面端反馈入口：顶栏下方、内容区右上角，移动端隐藏（移动端已在 Header 内提供） */}
+        <div className="hidden md:flex justify-end mb-2 -mt-4">
+          <button
+            type="button"
+            onClick={openFeedback}
+            className="inline-flex items-center gap-1.5 text-sm text-base-mute hover:text-brand-cyan transition-colors duration-150"
+            aria-label="问题反馈"
+          >
+            <MessageSquarePlus size={15} aria-hidden />
+            <span className="leading-none">反馈</span>
+          </button>
+        </div>
+
         {children}
       </main>
     </div>

@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
-import { BarChart3, CircleHelp, HeartHandshake, Home, Info } from 'lucide-react'
+import { BarChart3, CircleHelp, HeartHandshake, Home, Info, MessageSquarePlus } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { RESULTS } from '../../data/results'
 import { TYPE_GROUP_META } from '../../data/typeGroups'
+import { useFeedback } from '../feedback/FeedbackContext'
 
 const NAV_ITEMS = [
   { id: 'home', label: '首页', icon: Home },
@@ -22,6 +23,7 @@ export default function Header({
   onLogoHome,
 }) {
   const [typesOpen, setTypesOpen] = useState(false)
+  const { openFeedback } = useFeedback()
 
   const groupedTypes = useMemo(() => {
     const grouped = { SR: [], SP: [], IR: [], IP: [] }
@@ -75,6 +77,16 @@ export default function Header({
             Couple Type Indicator
           </span>
         </a>
+
+        {/* ── 移动端反馈入口（Logo 右侧，md 以上隐藏） ── */}
+        <button
+          type="button"
+          onClick={openFeedback}
+          className="md:hidden ml-2 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-base-mute hover:text-brand-cyan hover:bg-brand-cyan/10 transition-colors"
+          aria-label="问题反馈"
+        >
+          <MessageSquarePlus size={20} />
+        </button>
 
         {/* ── 桌面端居中导航 ── */}
         <nav className="hidden md:flex items-center gap-7 absolute left-1/2 -translate-x-1/2">

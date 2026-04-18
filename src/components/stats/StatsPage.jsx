@@ -205,7 +205,7 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
     <div className="pb-10">
       <header className="pt-4 pb-7 text-center md:pt-8">
         <p className="text-xs tracking-wide text-brand-cyan font-semibold">CPTI DATA VIEW</p>
-        <h1 className="mt-2 text-h1">CPTI 人群关系光谱</h1>
+        <h1 className="mt-2 text-h1">CPTI 亲密关系光谱</h1>
         <p className="mx-auto mt-2 max-w-2xl text-sm leading-relaxed text-base-mute">
           这是阶段性样本统计结果，用来帮助你观察“人群中的关系偏好分布”。
           <br />

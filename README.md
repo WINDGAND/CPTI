@@ -1,4 +1,4 @@
-# CPTI - 亲密光谱测试（Couple Type Indicator）
+﻿# CPTI - 亲密光谱测试（Couple Type Indicator）
 
 一个面向情侣关系的多端 H5 测评应用。  
 通过 4 个维度、16 种类型与可分享结果页，帮助用户理解“关系如何运作”，而非给个人贴标签。
@@ -15,6 +15,7 @@
 - [环境变量](#环境变量)
 - [数据与算法说明](#数据与算法说明)
 - [统计系统说明](#统计系统说明)
+- [问题反馈系统说明](#问题反馈系统说明)
 - [部署说明](#部署说明)
 - [常见问题（开发侧）](#常见问题开发侧)
 - [后续迭代建议](#后续迭代建议)
@@ -30,6 +31,7 @@
 - 双人拼图版：双方独立作答后合成最终关系类型
 - 结果报告页：展示代码类型、光谱分布、优势挑战、冲突模式、建议等
 - 统计页：展示实时（或回退）样本分布与类型趋势
+- 问题反馈：全站可用的轻量反馈入口，写入 Supabase `user_feedback` 表
 
 > 设计原则：移动端优先、动画流畅、静态前端优先、可快速社交传播。
 
@@ -86,14 +88,16 @@ CPTI/
 │  ├─ dual-invite-consume.js    # 校验/消费双人邀请 token
 │  ├─ stats-submit.js           # 提交测评结果（写入 Supabase）
 │  ├─ telemetry-submit.js       # 匿名埋点（每题分布/每维得分聚合）
-│  └─ stats-summary.js          # 拉取统计汇总（读视图）
+│  ├─ stats-summary.js          # 拉取统计汇总（读视图）
+│  └─ feedback-submit.js        # 提交用户反馈（写入 user_feedback 表）
 ├─ functions/
 │  └─ api/                      # Cloudflare Pages Functions（兼容层）
 │     ├─ dual-invite-create.js
 │     ├─ dual-invite-consume.js
 │     ├─ stats-submit.js
 │     ├─ telemetry-submit.js
-│     └─ stats-summary.js
+│     ├─ stats-summary.js
+│     └─ feedback-submit.js
 ├─ public/
 │  ├─ logo.png
 │  └─ images/cpti/              # 16 型配图（按 CODE 命名）
@@ -105,6 +109,7 @@ CPTI/
 │  │  ├─ stats/                 # 统计页
 │  │  ├─ faq/                   # FAQ 页
 │  │  ├─ about/                 # About 页
+│  │  ├─ feedback/              # 问题反馈（FeedbackContext + FeedbackModal）
 │  │  ├─ Questionnaire.jsx      # 问卷核心流程
 │  │  ├─ LikertScale.jsx        # 7 点量表组件
 │  │  ├─ Loading.jsx            # 分析过渡页
@@ -119,16 +124,19 @@ CPTI/
 │  │  ├─ scoring.js             # 计分、类型判定、单双人结果计算
 │  │  ├─ inviteCodec.js         # 双人邀请 token 参数读写
 │  │  ├─ statsApi.js            # 统计 API 客户端请求
+│  │  ├─ feedbackApi.js         # 反馈提交 API 客户端
 │  │  └─ typeListing.js         # 类型列表简介生成
 │  ├─ App.jsx                   # 顶层视图切换与流程编排
 │  ├─ main.jsx
 │  └─ index.css
 ├─ supabase/
-│  └─ stats_schema.sql          # Supabase 表、索引、RLS、统计视图
+│  ├─ stats_schema.sql          # Supabase 表、索引、RLS、统计视图
+│  └─ user_feedback.sql         # user_feedback 表与 RLS（反馈功能）
 ├─ server/
 │  ├─ stats-service.js          # Vercel + Cloudflare 共用统计服务逻辑
-│  └─ invite-service.js         # 双人邀请令牌创建/校验/消费
-│  └─ telemetry-service.js      # 匿名埋点聚合写入逻辑
+│  ├─ invite-service.js         # 双人邀请令牌创建/校验/消费
+│  ├─ telemetry-service.js      # 匿名埋点聚合写入逻辑
+│  └─ feedback-service.js       # 用户反馈写入逻辑（含限流）
 ├─ cpti_prd.md                  # 产品需求文档（权威）
 └─ README.md
 ```
@@ -266,6 +274,39 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
 ---
 
+## 问题反馈系统说明
+
+### 反馈入口
+
+- **移动端**：顶栏 Logo 右侧的气泡图标按钮（`md:hidden`）
+- **桌面端**：顶栏下方、内容区右上角的「反馈」链接按钮（`hidden md:flex`）
+
+### 提交接口：`POST /api/feedback-submit`
+
+请求体：
+
+```json
+{
+  "body": "用户填写的反馈内容（1-2000 字符）",
+  "pagePath": "/（当前页面路径，可选）"
+}
+```
+
+特性：
+
+- 必填校验（`body` 非空，≤ 2000 字符）
+- 基于 IP + UA 的 hash 做窗口限流（60 分钟最多 5 次）
+- 写入 `user_feedback` 表，存储 `body`、`page_path`、`fingerprint_hash`
+- 浏览器不可直连写库（RLS 全拦截）
+
+### 前端交互说明
+
+- 点击入口打开固定蒙层 + 卡片弹层（`FeedbackModal`）
+- 提交中禁用按钮，防止重复提交
+- 成功后展示感谢提示，关闭按钮收起弹层
+- 失败时展示错误信息并允许重试
+- 状态通过 React Context（`FeedbackProvider`）管理，无需 props 透传
+
 ## 部署说明
 
 支持两种部署平台：**Vercel** 与 **Cloudflare Pages**
@@ -290,14 +331,16 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
   - `/api/stats-summary`
   - `/api/dual-invite-create`
   - `/api/dual-invite-consume`
+  - `/api/feedback-submit`
 
 ### 4) Supabase 初始化
 
-在 Supabase SQL Editor 执行：
+在 Supabase SQL Editor **依次**执行：
 
-- `supabase/stats_schema.sql`
+1. `supabase/stats_schema.sql`
+2. `supabase/user_feedback.sql`
 
-该 SQL 将创建：
+`stats_schema.sql` 将创建：
 
 - `quiz_submissions` 数据表
 - `dual_invites` 一次性双人邀请令牌表
@@ -305,6 +348,12 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 - 必要索引
 - RLS 策略（禁用客户端直接访问该表）
 - `stats_summary_view` 聚合视图（供 API 查询）
+
+`user_feedback.sql` 将创建：
+
+- `user_feedback` 用户反馈表（含字段：`body`、`page_path`、`fingerprint_hash`）
+- 必要索引
+- RLS 策略（客户端无法直接读写，仅 Service Role 可插入）
 
 ---
 
