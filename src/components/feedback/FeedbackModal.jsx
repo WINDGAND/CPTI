@@ -111,7 +111,7 @@ export default function FeedbackModal({ open, onClose }) {
                     onChange={(e) => setBody(e.target.value.slice(0, MAX_LEN))}
                     placeholder="请描述你遇到的问题或建议..."
                     rows={4}
-                    className="w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-base-text placeholder:text-gray-400 focus:border-brand-cyan focus:outline-none focus:ring-1 focus:ring-brand-cyan transition-colors"
+                    className="w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-base md:text-sm text-base-text placeholder:text-gray-400 focus:border-brand-cyan focus:outline-none focus:ring-1 focus:ring-brand-cyan transition-colors"
                     disabled={status === 'submitting'}
                     required
                     maxLength={MAX_LEN}
