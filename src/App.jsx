@@ -4,8 +4,8 @@ import AppShell from './components/layout/AppShell'
 import HomeStepCards from './components/home/HomeStepCards'
 import Questionnaire from './components/Questionnaire'
 import Loading from './components/Loading'
-import FAQPage from './components/faq/FAQPage'
-import AboutPage from './components/about/AboutPage'
+import AiUnlockPage from './components/chat/AiUnlockPage'
+import HelpPage from './components/help/HelpPage'
 import StatsPage from './components/stats/StatsPage'
 import { QUESTIONS, QUESTIONS_PER_DIMENSION } from './data/questions'
 import { computeDualModeResult, computeSingleModeResult } from './utils/scoring'
@@ -28,9 +28,9 @@ const CoupleTypesPage = lazy(() => import('./components/types/CoupleTypesPage'))
  * mainTab（仅 view==='home'）:
  *   'quiz'  — 标题 + 三步引导 + 答题
  *   'types' — 情侣类型总览
+ *   'ai'    — AI 关系助手解锁说明
  *   'stats' — 统计总览
- *   'faq'   — 常见问题
- *   'about' — 关于 CPTI
+ *   'help'  — 常见问题 + 关于 CPTI
  */
 export default function App() {
   const [view, setView] = useState('home')
@@ -54,9 +54,20 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'instant' })
   }
 
-  function goFAQ() {
+  function goAiAssistant() {
+    if (resultData) {
+      setView('result')
+      window.setTimeout(() => {
+        document.getElementById('ai-relationship-chat')?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        })
+      }, 0)
+      return
+    }
+
     setView('home')
-    setMainTab('faq')
+    setMainTab('ai')
     window.scrollTo({ top: 0, behavior: 'instant' })
   }
 
@@ -66,9 +77,9 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'instant' })
   }
 
-  function goAbout() {
+  function goHelp() {
     setView('home')
-    setMainTab('about')
+    setMainTab('help')
     window.scrollTo({ top: 0, behavior: 'instant' })
   }
 
@@ -78,9 +89,9 @@ export default function App() {
       : null,
     onNavigateHome: goQuizHome,
     onNavigateCoupleTypes: goCoupleTypes,
+    onNavigateAI: goAiAssistant,
     onNavigateStats: goStats,
-    onNavigateFAQ: goFAQ,
-    onNavigateAbout: goAbout,
+    onNavigateHelp: goHelp,
     onLogoHome: goQuizHome,
   }
 
@@ -220,13 +231,10 @@ export default function App() {
           onStartTest={goQuizHome}
           onGoTypes={goCoupleTypes}
         />
-      ) : mainTab === 'faq' ? (
-        <FAQPage onStartTest={goQuizHome} />
-      ) : mainTab === 'about' ? (
-        <AboutPage
-          onStartTest={goQuizHome}
-          onGoFAQ={goFAQ}
-        />
+      ) : mainTab === 'ai' ? (
+        <AiUnlockPage onStartTest={goQuizHome} />
+      ) : mainTab === 'help' ? (
+        <HelpPage onStartTest={goQuizHome} />
       ) : (
         <>
           <div className="pt-4 pb-4 text-center md:pt-8">

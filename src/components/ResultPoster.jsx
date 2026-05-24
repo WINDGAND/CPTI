@@ -16,6 +16,7 @@ import { QUESTIONS } from '../data/questions'
 import { getTypeImageSources } from '../data/typeImages'
 import { recordImageMetric } from '../utils/imageMetrics'
 import { createDualInvite } from '../utils/statsApi'
+import AiRelationshipChat from './chat/AiRelationshipChat'
 
 /**
  * ResultPoster — 多分节深度报告页（8 个分区）
@@ -653,6 +654,12 @@ export default function ResultPoster({ resultData, onRestart }) {
       {/* ══════════════════════════════════════════════
           海报区域外：昵称输入 + 操作（不参与截图）
       ══════════════════════════════════════════════ */}
+
+      <div className="my-8 h-px bg-gray-200" />
+
+      <div className={result.themeClass}>
+        <AiRelationshipChat resultData={resultData} />
+      </div>
 
       <div className="my-8 h-px bg-gray-200" />
 

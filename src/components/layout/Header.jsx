@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { BarChart3, CircleHelp, HeartHandshake, Home, Info, MessageSquarePlus } from 'lucide-react'
+import { BarChart3, CircleHelp, HeartHandshake, Home, MessageCircleHeart, MessageSquarePlus } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { RESULTS } from '../../data/results'
 import { TYPE_GROUP_META } from '../../data/typeGroups'
@@ -8,18 +8,18 @@ import { useFeedback } from '../feedback/FeedbackContext'
 const NAV_ITEMS = [
   { id: 'home', label: '首页', icon: Home },
   { id: 'types', label: '情侣类型', icon: HeartHandshake },
+  { id: 'ai', label: 'AI', icon: MessageCircleHeart, featured: true },
   { id: 'stats', label: '统计', icon: BarChart3 },
-  { id: 'faq', label: '常见问题', icon: CircleHelp },
-  { id: 'about', label: '关于', icon: Info },
+  { id: 'help', label: '帮助', icon: CircleHelp },
 ]
 
 export default function Header({
   activeTab,
   onNavigateHome,
   onNavigateCoupleTypes,
+  onNavigateAI,
   onNavigateStats,
-  onNavigateFAQ,
-  onNavigateAbout,
+  onNavigateHelp,
   onLogoHome,
 }) {
   const [typesOpen, setTypesOpen] = useState(false)
@@ -45,9 +45,9 @@ export default function Header({
   function handleNavigate(itemId) {
     if (itemId === 'home') onNavigateHome?.()
     if (itemId === 'types') onNavigateCoupleTypes?.()
+    if (itemId === 'ai') onNavigateAI?.()
     if (itemId === 'stats') onNavigateStats?.()
-    if (itemId === 'faq') onNavigateFAQ?.()
-    if (itemId === 'about') onNavigateAbout?.()
+    if (itemId === 'help') onNavigateHelp?.()
   }
 
   return (
@@ -96,8 +96,12 @@ export default function Header({
             const isActive = activeTab === item.id
             const homeNudgeClass = item.id === 'home' ? '-translate-y-px' : ''
             const baseClass = [
-              'inline-flex h-8 items-center gap-1.5 leading-none text-sm lg:text-base transition-colors duration-150',
-              isActive ? 'text-brand-cyan font-semibold' : 'text-base-mute hover:text-brand-cyan',
+              item.featured
+                ? 'inline-flex h-10 items-center gap-2 rounded-full px-4 leading-none text-sm lg:text-base font-bold shadow-sm ring-1 transition-all duration-150'
+                : 'inline-flex h-8 items-center gap-1.5 leading-none text-sm lg:text-base transition-colors duration-150',
+              item.featured
+                ? (isActive ? 'bg-brand-cyan text-white ring-brand-cyan' : 'bg-brand-cyan/10 text-brand-cyan ring-brand-cyan/15 hover:bg-brand-cyan hover:text-white')
+                : (isActive ? 'text-brand-cyan font-semibold' : 'text-base-mute hover:text-brand-cyan'),
             ].join(' ')
 
             if (item.id === 'types') {
@@ -203,17 +207,28 @@ export default function Header({
                 key={item.id}
                 type="button"
                 className={[
-                  'flex flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 transition-colors leading-none',
-                  isActive ? 'text-brand-cyan bg-brand-cyan/10' : 'text-base-mute',
+                  item.featured
+                    ? 'relative -mt-5 flex flex-col items-center justify-center gap-1 rounded-2xl px-1 pb-1 pt-0 transition-all leading-none'
+                    : 'flex flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 transition-colors leading-none',
+                  item.featured
+                    ? (isActive ? 'text-brand-cyan' : 'text-brand-cyan')
+                    : (isActive ? 'text-brand-cyan bg-brand-cyan/10' : 'text-base-mute'),
                 ].join(' ')}
                 onClick={() => handleNavigate(item.id)}
                 aria-current={isActive ? 'page' : undefined}
                 aria-label={item.label}
               >
-                <span className={['inline-flex h-4 w-4 items-center justify-center', homeNudgeClass].join(' ')}>
-                  <Icon size={16} className="-translate-y-px" aria-hidden />
+                <span
+                  className={[
+                    item.featured
+                      ? 'inline-flex h-12 w-12 items-center justify-center rounded-full bg-brand-cyan text-white shadow-lg ring-4 ring-base-card'
+                      : 'inline-flex h-4 w-4 items-center justify-center',
+                    homeNudgeClass,
+                  ].join(' ')}
+                >
+                  <Icon size={item.featured ? 23 : 16} className="-translate-y-px" aria-hidden />
                 </span>
-                <span className={['text-[11px] leading-none font-medium', homeNudgeClass].join(' ')}>
+                <span className={[item.featured ? 'text-[12px] font-bold leading-none' : 'text-[11px] leading-none font-medium', homeNudgeClass].join(' ')}>
                   {item.label}
                 </span>
               </button>

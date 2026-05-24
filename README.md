@@ -30,6 +30,7 @@
 - 单人感知版：先看用户主观视角下的关系画像
 - 双人拼图版：双方独立作答后合成最终关系类型
 - 结果报告页：展示代码类型、光谱分布、优势挑战、冲突模式、建议等
+- AI 关系助手：测试后基于当前 CPTI 结果进行轻量情感问答，聊天记录仅保存在当前浏览器
 - 统计页：展示实时（或回退）样本分布与类型趋势
 - 问题反馈：全站可用的轻量反馈入口，写入 Supabase `user_feedback` 表
 
@@ -74,6 +75,7 @@
 - **图标**：Lucide React
 - **后端形态**：Vercel Serverless（`/api`）+ Cloudflare Pages Functions（`/functions/api`）
 - **数据库**：Supabase（统计存储与聚合视图）
+- **AI 模型**：DeepSeek V4 Flash（OpenAI-compatible Chat Completions）
 
 ---
 
@@ -89,7 +91,8 @@ CPTI/
 │  ├─ stats-submit.js           # 提交测评结果（写入 Supabase）
 │  ├─ telemetry-submit.js       # 匿名埋点（每题分布/每维得分聚合）
 │  ├─ stats-summary.js          # 拉取统计汇总（读视图）
-│  └─ feedback-submit.js        # 提交用户反馈（写入 user_feedback 表）
+│  ├─ feedback-submit.js        # 提交用户反馈（写入 user_feedback 表）
+│  └─ ai-chat.js                # AI 关系助手（调用 DeepSeek）
 ├─ functions/
 │  └─ api/                      # Cloudflare Pages Functions（兼容层）
 │     ├─ dual-invite-create.js
@@ -97,7 +100,8 @@ CPTI/
 │     ├─ stats-submit.js
 │     ├─ telemetry-submit.js
 │     ├─ stats-summary.js
-│     └─ feedback-submit.js
+│     ├─ feedback-submit.js
+│     └─ ai-chat.js
 ├─ public/
 │  ├─ logo.png
 │  └─ images/cpti/              # 16 型配图（按 CODE 命名）
@@ -110,6 +114,7 @@ CPTI/
 │  │  ├─ faq/                   # FAQ 页
 │  │  ├─ about/                 # About 页
 │  │  ├─ feedback/              # 问题反馈（FeedbackContext + FeedbackModal）
+│  │  ├─ chat/                  # AI 关系助手
 │  │  ├─ Questionnaire.jsx      # 问卷核心流程
 │  │  ├─ LikertScale.jsx        # 7 点量表组件
 │  │  ├─ Loading.jsx            # 分析过渡页
@@ -125,6 +130,8 @@ CPTI/
 │  │  ├─ inviteCodec.js         # 双人邀请 token 参数读写
 │  │  ├─ statsApi.js            # 统计 API 客户端请求
 │  │  ├─ feedbackApi.js         # 反馈提交 API 客户端
+│  │  ├─ aiChatApi.js           # AI 对话 API 客户端
+│  │  ├─ aiChatContext.js       # AI 对话上下文摘要生成
 │  │  └─ typeListing.js         # 类型列表简介生成
 │  ├─ App.jsx                   # 顶层视图切换与流程编排
 │  ├─ main.jsx
@@ -136,7 +143,8 @@ CPTI/
 │  ├─ stats-service.js          # Vercel + Cloudflare 共用统计服务逻辑
 │  ├─ invite-service.js         # 双人邀请令牌创建/校验/消费
 │  ├─ telemetry-service.js      # 匿名埋点聚合写入逻辑
-│  └─ feedback-service.js       # 用户反馈写入逻辑（含限流）
+│  ├─ feedback-service.js       # 用户反馈写入逻辑（含限流）
+│  └─ ai-chat-service.js        # DeepSeek 对话调用与输入校验
 ├─ cpti_prd.md                  # 产品需求文档（权威）
 └─ README.md
 ```
@@ -178,12 +186,17 @@ npm run preview
 ```env
 SUPABASE_URL=your_supabase_project_url
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+DEEPSEEK_API_KEY=your_deepseek_api_key
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_MODEL=deepseek-v4-flash
 ```
 
 说明：
 
 - `SUPABASE_SERVICE_ROLE_KEY` 仅用于 Serverless API，**不可暴露给浏览器端**
 - 本项目客户端不直连写库，提交与汇总均走 `/api/*`
+- `DEEPSEEK_API_KEY` 仅用于 Serverless API，浏览器端只请求 `/api/ai-chat`
+- `DEEPSEEK_BASE_URL` 与 `DEEPSEEK_MODEL` 可按部署环境覆盖，默认使用 `deepseek-v4-flash`
 
 ---
 
@@ -321,6 +334,9 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
+- `DEEPSEEK_API_KEY`
+- `DEEPSEEK_BASE_URL`
+- `DEEPSEEK_MODEL`
 
 ### 3) 平台路由说明
 
@@ -332,6 +348,7 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
   - `/api/dual-invite-create`
   - `/api/dual-invite-consume`
   - `/api/feedback-submit`
+  - `/api/ai-chat`
 
 ### 4) Supabase 初始化
 
