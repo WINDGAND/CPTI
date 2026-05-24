@@ -4,6 +4,10 @@ import {
   sha256Hex,
 } from '../server/stats-service.js'
 
+export const config = {
+  maxDuration: 60,
+}
+
 function readBody(req) {
   if (!req.body) return {}
   if (typeof req.body === 'string') {

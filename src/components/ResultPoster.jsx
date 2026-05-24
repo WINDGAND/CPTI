@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
+  ArrowRight,
   CheckCircle2,
   AlertCircle,
   Zap,
@@ -16,7 +17,6 @@ import { QUESTIONS } from '../data/questions'
 import { getTypeImageSources } from '../data/typeImages'
 import { recordImageMetric } from '../utils/imageMetrics'
 import { createDualInvite } from '../utils/statsApi'
-import AiRelationshipChat from './chat/AiRelationshipChat'
 
 /**
  * ResultPoster — 多分节深度报告页（8 个分区）
@@ -168,7 +168,7 @@ function ResultHeroIllustration({ code }) {
   )
 }
 
-export default function ResultPoster({ resultData, onRestart }) {
+export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
   const posterRef = useRef(null)
   const [nickname1, setNickname1] = useState('')
   const [nickname2, setNickname2] = useState('')
@@ -657,8 +657,46 @@ export default function ResultPoster({ resultData, onRestart }) {
 
       <div className="my-8 h-px bg-gray-200" />
 
-      <div className={result.themeClass}>
-        <AiRelationshipChat resultData={resultData} />
+      <div className="overflow-hidden rounded-[24px] border border-white/80 bg-white shadow-card">
+        <div
+          className="p-4 sm:p-5"
+          style={{
+            background:
+              'linear-gradient(135deg, color-mix(in srgb, var(--poster-accent) 14%, white), rgba(255,255,255,0.96) 58%, white)',
+          }}
+        >
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <span
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-white shadow-sm"
+                style={{ backgroundColor: 'var(--poster-accent)' }}
+              >
+                <MessageCircleHeart size={21} aria-hidden />
+              </span>
+              <div>
+                <div className="mb-1 flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-bold text-base-text">想继续聊聊这份报告？</p>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-white/80 px-2 py-1 text-[10px] font-semibold text-base-mute">
+                    <Sparkles size={12} aria-hidden />
+                    基于 {result.code}
+                  </span>
+                </div>
+                <p className="text-xs leading-6 text-base-mute">
+                  AI 关系助手已为你准备好独立聊天页，会带着当前类型、四维光谱和冲突模式继续回答具体问题。
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onOpenAi}
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+              style={{ backgroundColor: 'var(--poster-accent)' }}
+            >
+              进入 AI 聊天页
+              <ArrowRight size={16} aria-hidden />
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="my-8 h-px bg-gray-200" />

@@ -4,6 +4,7 @@ import AppShell from './components/layout/AppShell'
 import HomeStepCards from './components/home/HomeStepCards'
 import Questionnaire from './components/Questionnaire'
 import Loading from './components/Loading'
+import AiRelationshipPage from './components/chat/AiRelationshipPage'
 import AiUnlockPage from './components/chat/AiUnlockPage'
 import HelpPage from './components/help/HelpPage'
 import StatsPage from './components/stats/StatsPage'
@@ -13,9 +14,34 @@ import { submitStats, submitTelemetry } from './utils/statsApi'
 import { preloadTypeImage } from './data/typeImages'
 import { clearQuizDraft } from './utils/quizDraft'
 import { readSingleShareFromSearch, stripSingleShareFromUrl } from './utils/inviteCodec'
+import { readStoredResult, saveStoredResult } from './utils/resultPersistence'
 
 const ResultPoster = lazy(() => import('./components/ResultPoster'))
 const CoupleTypesPage = lazy(() => import('./components/types/CoupleTypesPage'))
+
+function getInitialStoredResult() {
+  const stored = readStoredResult()
+  return stored.status === 'ready' ? stored.resultData : null
+}
+
+function shouldOpenAiFromHash() {
+  return typeof window !== 'undefined'
+    && window.location.hash === '#ai'
+    && readStoredResult().status === 'ready'
+}
+
+function getInitialMainTab() {
+  if (typeof window !== 'undefined' && window.location.hash === '#ai' && readStoredResult().status !== 'ready') {
+    return 'ai'
+  }
+  return 'quiz'
+}
+
+function replaceLocationHash(hash = '') {
+  if (typeof window === 'undefined') return
+  const nextUrl = `${window.location.pathname}${window.location.search}${hash}`
+  window.history.replaceState({}, '', nextUrl)
+}
 
 /**
  * App — 顶层视图路由
@@ -24,6 +50,7 @@ const CoupleTypesPage = lazy(() => import('./components/types/CoupleTypesPage'))
  *   'home'    — 首页（问卷 或 情侣类型页）
  *   'loading' — 光谱分析过渡页（2s）
  *   'result'  — 结果海报
+ *   'ai'      — AI 关系助手独立页
  *
  * mainTab（仅 view==='home'）:
  *   'quiz'  — 标题 + 三步引导 + 答题
@@ -33,9 +60,9 @@ const CoupleTypesPage = lazy(() => import('./components/types/CoupleTypesPage'))
  *   'help'  — 常见问题 + 关于 CPTI
  */
 export default function App() {
-  const [view, setView] = useState('home')
-  const [mainTab, setMainTab] = useState('quiz')
-  const [resultData, setResultData] = useState(null)
+  const [view, setView] = useState(() => shouldOpenAiFromHash() ? 'ai' : 'home')
+  const [mainTab, setMainTab] = useState(getInitialMainTab)
+  const [resultData, setResultData] = useState(getInitialStoredResult)
   const [loadingMeta, setLoadingMeta] = useState({
     preloadTask: Promise.resolve(),
     minDurationMs: 800,
@@ -45,48 +72,53 @@ export default function App() {
     setResultData(null)
     setView('home')
     setMainTab('quiz')
+    replaceLocationHash('')
     window.scrollTo({ top: 0, behavior: 'instant' })
   }
 
   function goCoupleTypes() {
     setView('home')
     setMainTab('types')
+    replaceLocationHash('')
     window.scrollTo({ top: 0, behavior: 'instant' })
   }
 
   function goAiAssistant() {
-    if (resultData) {
-      setView('result')
-      window.setTimeout(() => {
-        document.getElementById('ai-relationship-chat')?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start',
-        })
-      }, 0)
+    const stored = resultData ? { status: 'ready', resultData } : readStoredResult()
+    if (stored.status === 'ready') {
+      setResultData(stored.resultData)
+      setView('ai')
+      replaceLocationHash('#ai')
+      window.scrollTo({ top: 0, behavior: 'instant' })
       return
     }
 
     setView('home')
     setMainTab('ai')
+    replaceLocationHash('#ai')
     window.scrollTo({ top: 0, behavior: 'instant' })
   }
 
   function goStats() {
     setView('home')
     setMainTab('stats')
+    replaceLocationHash('')
     window.scrollTo({ top: 0, behavior: 'instant' })
   }
 
   function goHelp() {
     setView('home')
     setMainTab('help')
+    replaceLocationHash('')
     window.scrollTo({ top: 0, behavior: 'instant' })
   }
 
   const headerNav = {
-    activeTab: view === 'home'
-      ? (mainTab === 'quiz' ? 'home' : mainTab)
-      : null,
+    activeTab: view === 'ai'
+      ? 'ai'
+      : view === 'home'
+        ? (mainTab === 'quiz' ? 'home' : mainTab)
+        : null,
     onNavigateHome: goQuizHome,
     onNavigateCoupleTypes: goCoupleTypes,
     onNavigateAI: goAiAssistant,
@@ -102,6 +134,7 @@ export default function App() {
     try {
       const computed = computeSingleModeResult(QUESTIONS, parsed.answers, QUESTIONS_PER_DIMENSION)
       setResultData(computed)
+      saveStoredResult(computed)
       setLoadingMeta({
         preloadTask: computed?.perception?.code ? preloadTypeImage(computed.perception.code) : Promise.resolve(),
         minDurationMs: 500,
@@ -162,6 +195,7 @@ export default function App() {
       : Promise.resolve()
 
     setResultData(computed)
+    saveStoredResult(computed)
     setLoadingMeta({
       preloadTask,
       minDurationMs: 800,
@@ -173,12 +207,30 @@ export default function App() {
   // Loading 结束 → 结果页
   function handleLoadingDone() {
     setView('result')
+    replaceLocationHash('')
+    window.scrollTo({ top: 0, behavior: 'instant' })
   }
 
   // 重新测试
   function handleRestart() {
     clearQuizDraft()
     goQuizHome()
+  }
+
+  function goResultFromAi() {
+    const stored = resultData ? { status: 'ready', resultData } : readStoredResult()
+    if (stored.status === 'ready') {
+      setResultData(stored.resultData)
+      setView('result')
+      replaceLocationHash('')
+      window.scrollTo({ top: 0, behavior: 'instant' })
+      return
+    }
+
+    setView('home')
+    setMainTab('ai')
+    replaceLocationHash('#ai')
+    window.scrollTo({ top: 0, behavior: 'instant' })
   }
 
   // ── Loading ────────────────────────────────────────────────
@@ -208,8 +260,31 @@ export default function App() {
               <ResultPoster
                 resultData={resultData}
                 onRestart={handleRestart}
+                onOpenAi={goAiAssistant}
               />
             </Suspense>
+          </motion.div>
+        </AnimatePresence>
+      </AppShell>
+    )
+  }
+
+  // ── AI 关系助手独立页 ───────────────────────────────────────
+  if (view === 'ai' && resultData) {
+    return (
+      <AppShell headerNav={headerNav}>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key="ai"
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.35 }}
+          >
+            <AiRelationshipPage
+              resultData={resultData}
+              onBackToResult={goResultFromAi}
+            />
           </motion.div>
         </AnimatePresence>
       </AppShell>

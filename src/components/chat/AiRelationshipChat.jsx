@@ -64,14 +64,15 @@ function MessageBubble({ message }) {
   )
 }
 
-export default function AiRelationshipChat({ resultData }) {
+export default function AiRelationshipChat({ resultData, className = '' }) {
   const context = useMemo(() => buildAiRelationshipContext(resultData), [resultData])
   const storageKey = useMemo(() => buildAiChatStorageKey(context), [context])
   const [messages, setMessages] = useState(() => readStoredMessages(storageKey))
   const [input, setInput] = useState('')
   const [error, setError] = useState('')
   const [isSending, setIsSending] = useState(false)
-  const scrollRef = useRef(null)
+  const messagesContainerRef = useRef(null)
+  const shouldAutoScrollRef = useRef(false)
 
   const suggestions = useMemo(() => {
     const code = context.code || '这类关系'
@@ -93,7 +94,17 @@ export default function AiRelationshipChat({ resultData }) {
   }, [messages, storageKey])
 
   useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    if (!shouldAutoScrollRef.current) return
+    shouldAutoScrollRef.current = false
+
+    window.requestAnimationFrame(() => {
+      const container = messagesContainerRef.current
+      if (!container) return
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: 'smooth',
+      })
+    })
   }, [messages, isSending])
 
   async function sendMessage(nextContent) {
@@ -103,6 +114,7 @@ export default function AiRelationshipChat({ resultData }) {
     const userMessage = createMessage('user', content)
     const nextMessages = [...messages, userMessage].slice(-MAX_LOCAL_MESSAGES)
 
+    shouldAutoScrollRef.current = true
     setMessages(nextMessages)
     setInput('')
     setError('')
@@ -113,6 +125,7 @@ export default function AiRelationshipChat({ resultData }) {
         context,
         messages: nextMessages.map(({ role, content }) => ({ role, content })).slice(-6),
       })
+      shouldAutoScrollRef.current = true
       setMessages((current) => [
         ...current,
         createMessage('assistant', assistantText),
@@ -140,7 +153,10 @@ export default function AiRelationshipChat({ resultData }) {
   return (
     <section
       id="ai-relationship-chat"
-      className="mt-10 overflow-hidden rounded-[24px] border border-white/70 bg-white/80 shadow-card backdrop-blur"
+      className={[
+        'overflow-hidden rounded-[24px] border border-white/70 bg-white/80 shadow-card backdrop-blur',
+        className,
+      ].join(' ')}
       style={{
         background: 'linear-gradient(145deg, color-mix(in srgb, var(--poster-accent) 14%, white), rgba(255,255,255,0.92) 52%, white)',
       }}
@@ -177,7 +193,7 @@ export default function AiRelationshipChat({ resultData }) {
         </div>
       </div>
 
-      <div className="max-h-[520px] min-h-[260px] space-y-4 overflow-y-auto px-4 py-5 sm:px-5">
+      <div ref={messagesContainerRef} className="max-h-[520px] min-h-[260px] space-y-4 overflow-y-auto px-4 py-5 sm:px-5">
         {messages.length === 0 ? (
           <div className="space-y-4">
             <div className="rounded-2xl border border-white/80 bg-white/70 p-4">
@@ -221,7 +237,6 @@ export default function AiRelationshipChat({ resultData }) {
             </div>
           </motion.div>
         )}
-        <div ref={scrollRef} />
       </div>
 
       {error && (
