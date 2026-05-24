@@ -43,6 +43,15 @@ function formatError(error) {
   if (error?.code === 'deepseek-key-missing') {
     return 'AI 服务还没有配置好 DeepSeek Key，部署环境需要补充环境变量。'
   }
+  if (error?.code === 'network-error') {
+    return '网络好像有点不稳，请检查连接后再试一次。'
+  }
+  if (error?.code === 'idle-timeout' || error?.code === 'hard-timeout') {
+    return 'AI 这次连接好像中断了，请重新发送试试。'
+  }
+  if (error?.code === 'empty-response') {
+    return 'AI 这次没有给出回复，请重新发送试试。'
+  }
   if (error?.status === 504) return 'AI 这次思考超时了，稍后再试一次。'
   return error?.message || 'AI 关系助手暂时没有回应，请稍后重试。'
 }
@@ -242,7 +251,16 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
               : m
           ))
         })
+      } else if (err?.partial && err.partial.trim()) {
+        // 客户端超时但已经收到部分内容：保留半截回复 + 提示
+        setMessages((cur) => cur.map((entry) => (
+          entry.id === assistantMessage.id
+            ? { ...entry, content: `${err.partial}\n\n_（连接中断，回复未完成）_` }
+            : entry
+        )))
+        setError(formatError(err))
       } else {
+        console.warn('[AiRelationshipChat] request failed', err)
         setMessages((cur) => cur.filter((entry) => entry.id !== assistantMessage.id))
         setError(formatError(err))
       }

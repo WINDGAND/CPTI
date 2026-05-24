@@ -73,7 +73,7 @@ export default function ChatShareModal({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.18 }}
-          className="fixed inset-0 z-[80] flex items-end justify-center bg-black/45 px-3 pb-3 pt-10 md:items-center md:py-6"
+          className="fixed inset-0 z-[80] flex items-end justify-center bg-black/45 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-[calc(env(safe-area-inset-top)+0.75rem)] md:items-center md:p-6"
         >
           <div className="absolute inset-0" onClick={onClose} aria-hidden />
 
@@ -83,7 +83,7 @@ export default function ChatShareModal({
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 60, opacity: 0 }}
             transition={{ type: 'tween', ease: [0.22, 0.61, 0.36, 1], duration: 0.28 }}
-            className="relative z-10 flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+            className="relative z-10 flex max-h-full w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl md:max-h-[min(88dvh,860px)]"
           >
             <div className="flex shrink-0 items-start justify-between gap-3 border-b border-gray-100 px-5 py-4 sm:px-6">
               <div>
