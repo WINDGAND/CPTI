@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { CornerDownLeft, Send, Square, X } from 'lucide-react'
+import { Send, Square, X } from 'lucide-react'
 
 const MAX_LENGTH = 800
 
@@ -74,9 +74,7 @@ export default function ChatComposer({
 
       <div
         className={[
-          'mx-auto flex w-full max-w-3xl items-end gap-2 rounded-2xl border border-gray-200 bg-white px-3 py-2 transition-all',
-          'shadow-[0_8px_24px_-18px_rgba(15,23,42,0.25)]',
-          'focus-within:border-brand-cyan/50 focus-within:shadow-[0_10px_30px_-18px_rgba(66,152,180,0.5)]',
+          'mx-auto flex w-full max-w-3xl items-end gap-2 rounded-[20px] bg-white px-3 py-2 transition-colors',
         ].join(' ')}
       >
         <textarea
@@ -112,15 +110,14 @@ export default function ChatComposer({
         )}
       </div>
 
-      <div className="mx-auto mt-1.5 flex w-full max-w-3xl items-center justify-between px-2 text-[10.5px] text-base-mute">
-        <span className="flex items-center gap-1.5">
-          <CornerDownLeft size={10} aria-hidden />
-          回车发送 · Shift + Enter 换行
-        </span>
-        <span className={trimmedLen > MAX_LENGTH - 60 ? 'text-rose-500' : ''}>
-          {trimmedLen}/{MAX_LENGTH}
-        </span>
-      </div>
+      {/* 字数提示：仅在接近上限时显示，避免常态干扰 */}
+      {trimmedLen > MAX_LENGTH - 100 && (
+        <div className="mx-auto mt-1 flex w-full max-w-3xl justify-end px-2">
+          <span className={['text-[10.5px]', trimmedLen > MAX_LENGTH - 60 ? 'text-rose-500' : 'text-base-mute'].join(' ')}>
+            {trimmedLen}/{MAX_LENGTH}
+          </span>
+        </div>
+      )}
     </form>
   )
 }

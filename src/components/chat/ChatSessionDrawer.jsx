@@ -179,7 +179,7 @@ function SessionRow({ session, isCurrent, onSelect, onRename, onDelete }) {
 function SessionList({ sessions, currentSessionId, onSelectSession, onRenameSession, onDeleteSession, onNewSession, footer }) {
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="shrink-0 px-3 pb-3 pt-1">
+      <div className="shrink-0 px-3 pb-3 pt-3">
         <button
           type="button"
           onClick={onNewSession}
@@ -190,15 +190,13 @@ function SessionList({ sessions, currentSessionId, onSelectSession, onRenameSess
         </button>
       </div>
 
-      <div className="hairline-t shrink-0" />
-
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
+      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2 pt-1">
         {sessions.length === 0 ? (
-          <p className="px-3 py-6 text-center text-[12px] leading-6 text-base-mute">
-            还没有任何对话。点击上方「新建对话」开始第一段。
+          <p className="px-3 pt-8 text-center text-[12px] leading-6 text-base-mute/80">
+            还没有任何对话
           </p>
         ) : (
-          <ul className="space-y-1">
+          <ul className="space-y-0.5">
             {sessions.map((s) => (
               <li key={s.id}>
                 <SessionRow
@@ -214,7 +212,7 @@ function SessionList({ sessions, currentSessionId, onSelectSession, onRenameSess
         )}
       </div>
 
-      {footer && <div className="hairline-t shrink-0 px-3 py-3">{footer}</div>}
+      {footer && <div className="shrink-0 px-3 pb-3 pt-1">{footer}</div>}
     </div>
   )
 }
@@ -229,29 +227,43 @@ export default function ChatSessionDrawer({
   onRenameSession,
   onDeleteSession,
   variant = 'mobile',
+  collapsed = false,
   footer,
 }) {
   if (variant === 'desktop') {
     return (
       <aside
-        className="hidden md:flex h-full w-[260px] shrink-0 flex-col rounded-2xl border border-gray-100 bg-white/85 backdrop-blur-sm"
+        className={[
+          'relative hidden md:flex h-full shrink-0 flex-col overflow-hidden transition-[width] duration-300 ease-out',
+          collapsed ? 'w-0' : 'w-[260px]',
+        ].join(' ')}
         aria-label="对话历史"
+        aria-hidden={collapsed}
       >
-        <div className="shrink-0 px-4 pt-4">
-          <p className="text-eyebrow">Conversations</p>
-          <p className="mt-1 text-[12px] leading-5 text-base-mute">
-            仅保存在当前浏览器，最多 20 条。
-          </p>
+        {/* 用一个固定宽度的内层包裹，配合外层 w-0/w-[260px] 切换实现平滑收起 */}
+        <div
+          className={[
+            'flex h-full w-[260px] flex-col transition-opacity duration-200',
+            collapsed ? 'pointer-events-none opacity-0' : 'opacity-100',
+          ].join(' ')}
+        >
+          <SessionList
+            sessions={sessions}
+            currentSessionId={currentSessionId}
+            onSelectSession={onSelectSession}
+            onRenameSession={onRenameSession}
+            onDeleteSession={onDeleteSession}
+            onNewSession={onNewSession}
+            footer={footer}
+          />
         </div>
-        <SessionList
-          sessions={sessions}
-          currentSessionId={currentSessionId}
-          onSelectSession={onSelectSession}
-          onRenameSession={onRenameSession}
-          onDeleteSession={onDeleteSession}
-          onNewSession={onNewSession}
-          footer={footer}
-        />
+        {/* 右侧 hairline 列分隔，比 border + bg 更原生 */}
+        {!collapsed && (
+          <span
+            className="pointer-events-none absolute right-0 top-3 bottom-3 w-px bg-gray-100/80"
+            aria-hidden
+          />
+        )}
       </aside>
     )
   }
@@ -279,11 +291,8 @@ export default function ChatSessionDrawer({
             style={{ paddingTop: 'env(safe-area-inset-top)' }}
             aria-label="对话历史"
           >
-            <div className="flex shrink-0 items-center justify-between px-4 py-4">
-              <div>
-                <p className="text-eyebrow">Conversations</p>
-                <p className="mt-1 text-[12px] leading-5 text-base-mute">仅保存在当前浏览器，最多 20 条。</p>
-              </div>
+            <div className="flex shrink-0 items-center justify-between px-4 py-3">
+              <p className="text-[14px] font-bold text-base-text">对话历史</p>
               <button
                 type="button"
                 onClick={onClose}
@@ -293,7 +302,6 @@ export default function ChatSessionDrawer({
                 <X size={17} />
               </button>
             </div>
-            <div className="hairline-t shrink-0" />
             <SessionList
               sessions={sessions}
               currentSessionId={currentSessionId}

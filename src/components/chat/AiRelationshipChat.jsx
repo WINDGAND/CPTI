@@ -5,9 +5,10 @@ import {
   CheckSquare,
   History,
   MessageCirclePlus,
+  PanelLeftClose,
+  PanelLeftOpen,
   Pencil,
   Share2,
-  Sparkles,
   Trash2,
   X,
 } from 'lucide-react'
@@ -81,6 +82,18 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
   const [selectedIds, setSelectedIds] = useState(() => new Set())
   const [showJumpToBottom, setShowJumpToBottom] = useState(false)
   const [confirmClearOpen, setConfirmClearOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false
+    try { return window.localStorage.getItem('cpti_ai_sidebar_collapsed') === '1' }
+    catch { return false }
+  })
+
+  /* ── 持久化 sidebar 收起状态 ────────────────────────────── */
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try { window.localStorage.setItem('cpti_ai_sidebar_collapsed', sidebarCollapsed ? '1' : '0') }
+    catch { /* 配额满或隐私模式静默 */ }
+  }, [sidebarCollapsed])
 
   // 滚动
   const scrollerRef = useRef(null)
@@ -384,10 +397,11 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
   }, [messages])
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col md:flex-row md:gap-5">
-      {/* 桌面端会话侧栏 */}
+    <div className="flex h-full min-h-0 w-full flex-col md:flex-row">
+      {/* 桌面端会话侧栏（可折叠） */}
       <ChatSessionDrawer
         variant="desktop"
+        collapsed={sidebarCollapsed}
         sessions={sortedSessions}
         currentSessionId={currentSessionId}
         onSelectSession={handleSwitchSession}
@@ -443,20 +457,31 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
       {/* 主区域 */}
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
 
-        {/* 工具栏 */}
-        <div className="relative z-20 flex shrink-0 items-center justify-between gap-2 border-b border-gray-100 bg-white/80 px-3 py-2.5 backdrop-blur sm:px-4">
-          <div className="min-w-0 flex items-center gap-2.5">
+        {/* 工具栏 — 透明背景，仅靠底部 hairline 与消息区分隔 */}
+        <div className="relative z-20 flex shrink-0 items-center justify-between gap-2 px-3 py-2.5 sm:px-4">
+          <div className="min-w-0 flex items-center gap-1.5">
+            {/* 桌面端 sidebar 收起/展开切换 */}
+            <button
+              type="button"
+              onClick={() => setSidebarCollapsed((v) => !v)}
+              className="hidden md:inline-flex h-8 w-8 items-center justify-center rounded-md text-base-mute transition-colors hover:bg-black/[0.045] hover:text-base-text"
+              aria-label={sidebarCollapsed ? '展开对话历史' : '收起对话历史'}
+              title={sidebarCollapsed ? '展开对话历史' : '收起对话历史'}
+            >
+              {sidebarCollapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
+            </button>
             {toolbarLeft}
-            <div className="min-w-0">
-              <p className="truncate text-[13px] font-bold leading-tight text-base-text">
+            <div className="min-w-0 flex items-center gap-2">
+              <p className="truncate text-[13.5px] font-bold leading-tight text-base-text">
                 {selectionMode ? `已选 ${selectedIds.size} 条` : sessionTitle}
               </p>
-              {!selectionMode && (
-                <p className="mt-0.5 flex items-center gap-1.5 text-[10.5px] leading-none text-base-mute">
-                  <Sparkles size={10} aria-hidden />
-                  基于 <span className="font-semibold text-base-text">{context.code}</span> 结果
-                  {context.mode === 'dual' ? ' · 双人' : ' · 单人'}
-                </p>
+              {!selectionMode && context.code && (
+                <span
+                  className="hidden sm:inline-flex h-5 shrink-0 items-center rounded-full bg-brand-cyan/10 px-2 text-[10px] font-semibold tracking-wide text-brand-cyan"
+                  title={`基于 ${context.code} 结果${context.mode === 'dual' ? '（双人）' : '（单人）'}`}
+                >
+                  {context.code}
+                </span>
               )}
             </div>
           </div>
@@ -606,8 +631,13 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
           </div>
         )}
 
-        {/* 底部输入区 */}
-        <div className="shrink-0 border-t border-gray-100 bg-white/95 px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur sm:px-5 sm:pb-4 md:pb-4">
+        {/* 底部输入区 — 透明背景，顶部 fade overlay 让消息渐隐到背景，composer 自己是独立圆角浮泡 */}
+        <div className="relative shrink-0 px-3 pt-2 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-5 sm:pb-4 md:pb-4">
+          {/* 渐隐遮罩：让消息滚到底部时柔和消失，而不是被硬白底切断 */}
+          <div
+            className="pointer-events-none absolute -top-8 left-0 right-0 h-8 bg-gradient-to-b from-transparent to-base-bg"
+            aria-hidden
+          />
           <ChatComposer
             value={input}
             onChange={setInput}

@@ -51,19 +51,14 @@ export default function ChatEmptyState({ context, disabled = false, onPick }) {
   const scenes = buildScenes(context)
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-1 pt-4 pb-2 md:pt-6">
-      {/* 极简引导：一行大标题 + 一行说明，去掉冗余 banner */}
-      <header className="mb-5 md:mb-7">
-        <h2 className="text-[20px] font-extrabold leading-tight text-base-text md:text-[24px]">
-          带着这份 CPTI 报告，<span className="text-base-mute">一起把一个具体的事拆小一点。</span>
-        </h2>
-        <p className="mt-2 max-w-2xl text-[12.5px] leading-6 text-base-mute md:text-[13px]">
-          挑一个最贴近你现在状态的场景开始，AI 会结合你的类型、四维光谱与冲突模式给出具体回应。
-        </p>
-      </header>
+    <div className="mx-auto w-full max-w-4xl px-1 pt-6 pb-2 md:pt-10">
+      {/* 极简引导：仅保留一句核心提问 */}
+      <h2 className="mb-6 text-[20px] font-extrabold leading-tight text-base-text md:mb-9 md:text-[26px]">
+        今天，<span className="text-base-mute">想跟我聊些什么？</span>
+      </h2>
 
       {/* 4 场景 — 桌面端 4 列，平板 2 列，移动 1 列；hairline 分隔，去卡片 */}
-      <div className="grid grid-cols-1 gap-x-7 gap-y-5 sm:grid-cols-2 lg:grid-cols-4 lg:divide-x lg:divide-gray-100">
+      <div className="grid grid-cols-1 gap-x-7 gap-y-5 sm:grid-cols-2 lg:grid-cols-4 lg:divide-x lg:divide-gray-100/80">
         {scenes.map((scene, idx) => {
           const Icon = scene.icon
           return (
@@ -72,7 +67,7 @@ export default function ChatEmptyState({ context, disabled = false, onPick }) {
               className={[
                 'relative min-w-0',
                 idx > 0 ? 'sm:pt-0 lg:pl-6' : 'lg:pr-2',
-                idx > 0 ? 'pt-5 border-t border-gray-100 sm:border-t-0' : '',
+                idx > 0 ? 'pt-5 border-t border-gray-100/80 sm:border-t-0' : '',
               ].join(' ')}
             >
               <div className="mb-2.5 flex items-center gap-2">
@@ -113,10 +108,6 @@ export default function ChatEmptyState({ context, disabled = false, onPick }) {
           )
         })}
       </div>
-
-      <p className="mt-5 max-w-2xl text-[10.5px] leading-5 text-base-mute md:text-[11px]">
-        提醒：AI 仅提供沟通参考，不能替代心理咨询、医疗建议或现实中的安全求助。聊天记录仅保存在当前浏览器。
-      </p>
     </div>
   )
 }

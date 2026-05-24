@@ -159,7 +159,7 @@ function ResultHeroIllustration({ code }) {
         className="h-full w-full object-cover object-center"
         style={{ opacity: loaded ? 1 : 0 }}
         loading="eager"
-        fetchPriority="high"
+        fetchpriority="high"
         decoding="async"
         onLoad={handleLoad}
         onError={handleError}

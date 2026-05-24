@@ -30,43 +30,49 @@ export default function AiRelationshipPage({ resultData, onBackToResult }) {
     <div
       className={[
         'relative w-full',
-        // 高度：占满视口除去顶栏（移动端再让出底部导航）
-        'h-[calc(100dvh-4rem-72px-env(safe-area-inset-bottom))]',
-        'sm:h-[calc(100dvh-4.5rem-72px-env(safe-area-inset-bottom))]',
+        // 高度：占满视口除去浮空顶栏 + 移动端再让出浮空底部导航（含 safe-area）
+        // 浮空底部 Tab 约 86px = 浮空 pill 自身 ~74px + 外壳 pb 12px
+        'h-[calc(100dvh-4rem-86px-env(safe-area-inset-bottom))]',
+        'sm:h-[calc(100dvh-4.5rem-86px-env(safe-area-inset-bottom))]',
         'md:h-[calc(100dvh-5rem)]',
         themeClass,
       ].join(' ')}
     >
-      {/* 背景光晕：极淡的三色 radial，替代以前的大白卡 */}
+      {/* 背景光晕：fixed 覆盖整个视口，让主题渐变与 AppShell 周围背景无缝衔接
+       * 避免在大屏（视口 > max-w-6xl）下出现"渐变块嵌在白底里"的割裂感
+       * 跟随 AI 助手页生命周期：进入页面时显示，离开时随组件 unmount 自动消失 */}
       <div
-        className="pointer-events-none absolute inset-0 -z-10"
+        className="pointer-events-none fixed inset-0 -z-10"
         style={{
           background:
-            'radial-gradient(circle at 12% 18%, rgba(118,184,224,0.16), transparent 30%),' +
-            'radial-gradient(circle at 86% 14%, rgba(244,167,176,0.14), transparent 30%),' +
-            'radial-gradient(circle at 50% 100%, rgba(142,214,180,0.12), transparent 40%)',
+            'radial-gradient(circle at 12% 18%, rgba(118,184,224,0.18), transparent 32%),' +
+            'radial-gradient(circle at 86% 14%, rgba(244,167,176,0.16), transparent 32%),' +
+            'radial-gradient(circle at 50% 100%, rgba(142,214,180,0.14), transparent 42%)',
         }}
         aria-hidden
       />
 
-      {/* 极淡的主题色边缘装饰：左上角一道 hairline + accent 短色条 */}
-      <div className="pointer-events-none absolute left-0 right-0 top-0 -z-10 hidden md:flex md:items-center md:gap-3 md:px-6 md:pt-3">
-        <span
-          className="h-[2px] w-12 rounded-full"
-          style={{ background: 'var(--poster-accent, #4298b4)', opacity: 0.85 }}
-          aria-hidden
-        />
-        <p className="text-[10.5px] font-semibold uppercase tracking-[0.18em] text-base-mute">
-          ai · companion
-        </p>
-      </div>
-
-      <div className="relative h-full min-h-0 px-0 md:px-2 md:pb-2 md:pt-9">
-        <AiRelationshipChat
-          resultData={resultData}
-          themeClass={themeClass}
-          toolbarLeft={backButton}
-        />
+      {/* 主体内容外层 padding：仅桌面端，让卡片不贴视口边缘，呈现浮空感 */}
+      <div className="relative h-full min-h-0 md:px-3 md:pb-3 lg:px-4 lg:pb-4">
+        {/* 柔和半透明卡片容器：
+         *   - 半透明白底 + backdrop-blur，能透出底层主题渐变，不死板
+         *   - 大圆角 + 极淡描边 + 微妙阴影，跟周围渐变形成清晰视觉分区
+         *   - 仅 md+ 启用卡片效果，移动端保持全屏沉浸（避免双层 padding 浪费空间）
+         */}
+        <div
+          className={[
+            'relative h-full min-h-0 overflow-hidden',
+            'md:rounded-[28px] md:bg-white/55 md:backdrop-blur-md',
+            'md:ring-1 md:ring-white/55',
+            'md:shadow-[0_20px_60px_-30px_rgba(15,23,42,0.18)]',
+          ].join(' ')}
+        >
+          <AiRelationshipChat
+            resultData={resultData}
+            themeClass={themeClass}
+            toolbarLeft={backButton}
+          />
+        </div>
       </div>
     </div>
   )

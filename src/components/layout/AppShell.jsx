@@ -22,7 +22,7 @@ export default function AppShell({
 }) {
   const whitePage = contentSurface === 'white'
   const wide = contentWidth === 'wide'
-  const mobileBottomPadding = compactMobileBottom ? 'pb-0' : 'pb-24'
+  const mobileBottomPadding = compactMobileBottom ? 'pb-0' : 'pb-28'
   const desktopBottomPadding = flushBottom ? 'md:pb-0' : (wide ? 'md:pb-10' : 'md:pb-8')
   const mainTopPadding = flushTop || whitePage ? 'pt-0 md:pt-0' : compactMobileBottom ? 'pt-3 md:pt-8' : 'pt-5 md:pt-8'
   const horizontalPadding = flushHorizontal ? 'px-0 md:px-0 lg:px-0' : (wide ? 'px-4 md:px-6 lg:px-8' : 'px-4')
