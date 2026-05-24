@@ -1,4 +1,4 @@
-import { ArrowLeft, ClipboardList, MessageCircleHeart, Sparkles } from 'lucide-react'
+import { ArrowLeft, ClipboardList, Sparkles } from 'lucide-react'
 import { buildAiRelationshipContext } from '../../utils/aiChatContext'
 import { getResultThemeClass } from '../../utils/resultTheme'
 import AiRelationshipChat from './AiRelationshipChat'
@@ -8,8 +8,8 @@ export default function AiRelationshipPage({ resultData, onBackToResult }) {
   const themeClass = getResultThemeClass(resultData)
 
   return (
-    <div className={`pb-10 ${themeClass}`}>
-      <section className="relative overflow-hidden rounded-[28px] border border-white/80 bg-white p-5 shadow-card sm:p-7">
+    <div className={`flex min-h-[calc(100dvh-4rem)] flex-col md:min-h-0 md:pb-10 ${themeClass}`}>
+      <section className="relative shrink-0 overflow-hidden rounded-[28px] border border-white/80 bg-white p-5 shadow-card sm:p-7">
         <div
           className="absolute inset-0 opacity-80"
           style={{
@@ -50,14 +50,9 @@ export default function AiRelationshipPage({ resultData, onBackToResult }) {
         </div>
       </section>
 
-      <div className="mt-5">
-        <AiRelationshipChat resultData={resultData} />
+      <div className="mt-4 flex min-h-0 flex-1 flex-col md:mt-5">
+        <AiRelationshipChat resultData={resultData} className="flex min-h-0 flex-1 flex-col" />
       </div>
-
-      <p className="mt-4 flex items-start gap-2 rounded-2xl border border-gray-100 bg-white/80 px-4 py-3 text-xs leading-6 text-base-mute shadow-sm">
-        <MessageCircleHeart size={15} className="mt-0.5 shrink-0 text-brand-cyan" aria-hidden />
-        AI 关系助手只提供沟通参考，不替代心理咨询、医疗建议或现实中的安全求助。
-      </p>
     </div>
   )
 }

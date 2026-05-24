@@ -178,11 +178,11 @@ export default function AiRelationshipChat({ resultData, className = '' }) {
     <section
       id="ai-relationship-chat"
       className={[
-        'overflow-hidden rounded-[24px] border border-gray-100 bg-white shadow-card',
+        'flex min-h-0 flex-col overflow-hidden rounded-[24px] border border-gray-100 bg-white shadow-card md:rounded-[24px]',
         className,
       ].join(' ')}
     >
-      <div className="border-b border-gray-100 px-4 py-5 sm:px-5">
+      <div className="shrink-0 border-b border-gray-100 px-4 py-5 sm:px-5">
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-cyan text-white shadow-sm">
             <MessageCircleHeart size={20} />
@@ -211,7 +211,7 @@ export default function AiRelationshipChat({ resultData, className = '' }) {
         </div>
       </div>
 
-      <div ref={messagesContainerRef} className="max-h-[520px] min-h-[260px] space-y-4 overflow-y-auto bg-gray-50/60 px-4 py-5 sm:px-5">
+      <div ref={messagesContainerRef} className="min-h-[180px] flex-1 space-y-4 overflow-y-auto bg-gray-50/60 px-4 py-5 sm:px-5 md:max-h-[520px] md:flex-none md:min-h-[260px]">
         {messages.length === 0 ? (
           <div className="space-y-4">
             <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
@@ -256,7 +256,7 @@ export default function AiRelationshipChat({ resultData, className = '' }) {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="border-t border-gray-100 bg-white p-3 sm:p-4">
+      <form onSubmit={handleSubmit} className="shrink-0 border-t border-gray-100 bg-white p-3 pb-[calc(4.25rem+env(safe-area-inset-bottom))] sm:p-4 md:pb-4">
         <div className="flex items-end gap-2 rounded-2xl border border-gray-200 bg-white p-2 shadow-sm focus-within:border-brand-cyan">
           <textarea
             value={input}
