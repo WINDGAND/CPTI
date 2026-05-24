@@ -424,13 +424,19 @@
     100% { transform: scale(2.0);  opacity: 0;    }
   }
 
-  /* ── Hero 色带 reveal（横向遮罩从左到右展开）── */
+  /* ── Hero 色带 reveal（横向遮罩从左到右展开）──
+   * 使用 mask-image 而非 clip-path，避免覆盖 .cpti-result-hero-bleed
+   * 的多边形斜切底边（clip-path animation 的 forwards 行为会永久持有
+   * 最后一帧的 inset(0) 矩形，把基础类的 polygon(...) 顶掉）
+   */
   .hero-band-reveal {
+    -webkit-mask: linear-gradient(90deg, #000 50%, transparent 50%) 100% 0 / 200% 100% no-repeat;
+            mask: linear-gradient(90deg, #000 50%, transparent 50%) 100% 0 / 200% 100% no-repeat;
     animation: band-reveal 900ms cubic-bezier(0.16, 0.84, 0.34, 1) both;
   }
   @keyframes band-reveal {
-    0%   { clip-path: inset(0 100% 0 0); opacity: 0.6; }
-    100% { clip-path: inset(0 0    0 0); opacity: 1;   }
+    0%   { -webkit-mask-position: 100% 0; mask-position: 100% 0; opacity: 0.6; }
+    100% { -webkit-mask-position: 0%   0; mask-position: 0%   0; opacity: 1;   }
   }
 
   /* ── Editorial Tab 激活态：底部 2px 短色条 ── */

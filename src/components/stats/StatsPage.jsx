@@ -212,39 +212,37 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
           数据用于理解趋势，不用于定义关系价值高低。
         </p>
 
-        {/* 累计份数 — 编辑物风格 hairline 数据陈列 */}
-        <div className="mx-auto mt-7 max-w-md">
-          <div className="relative pl-4 text-left">
-            <span
-              className="absolute left-0 top-1 h-[calc(100%-0.25rem)] w-[3px] rounded-full bg-brand-cyan"
-              aria-hidden
-            />
-            <p className="text-eyebrow">累计问卷份数</p>
-            <p className="font-display mt-1 text-4xl md:text-5xl font-black tabular-nums text-base-text leading-none">
-              {isLoading ? (
-                <span className="inline-block h-12 w-32 rounded bg-gray-200 animate-pulse" />
-              ) : hasData ? (
-                <CountUpNumber target={statsData.totalSubmissions} />
-              ) : (
-                '--'
-              )}
-            </p>
-            <p className="mt-2 text-xs text-base-mute">
-              数据更新时间：{hasData ? statsData.lastUpdated : '--'} · {hasData ? statsData.sourceNote : '--'}
-            </p>
-            {isError && statsError && (
-              <div className="mt-2 flex flex-col items-start gap-2">
-                <p className="text-xs text-amber-600">{statsError}</p>
-                <button
-                  type="button"
-                  className="rounded-full border border-brand-cyan/30 bg-white px-3 py-1 text-xs font-semibold text-brand-cyan transition hover:bg-brand-cyan hover:text-white"
-                  onClick={() => setRetryCount((count) => count + 1)}
-                >
-                  重试获取数据
-                </button>
-              </div>
+        {/* 累计份数 — 整体居中陈列，顶部短色条做主题锚点 */}
+        <div className="mt-7 flex flex-col items-center">
+          <span
+            className="h-[3px] w-10 rounded-full bg-brand-cyan"
+            aria-hidden
+          />
+          <p className="text-eyebrow mt-2.5">累计问卷份数</p>
+          <p className="font-display mt-1 text-4xl md:text-5xl font-black tabular-nums text-base-text leading-none">
+            {isLoading ? (
+              <span className="inline-block h-12 w-32 rounded bg-gray-200 animate-pulse" />
+            ) : hasData ? (
+              <CountUpNumber target={statsData.totalSubmissions} />
+            ) : (
+              '--'
             )}
-          </div>
+          </p>
+          <p className="mt-2 text-xs text-base-mute">
+            数据更新时间：{hasData ? statsData.lastUpdated : '--'} · {hasData ? statsData.sourceNote : '--'}
+          </p>
+          {isError && statsError && (
+            <div className="mt-2 flex flex-col items-center gap-2">
+              <p className="text-xs text-amber-600">{statsError}</p>
+              <button
+                type="button"
+                className="rounded-full border border-brand-cyan/30 bg-white px-3 py-1 text-xs font-semibold text-brand-cyan transition hover:bg-brand-cyan hover:text-white"
+                onClick={() => setRetryCount((count) => count + 1)}
+              >
+                重试获取数据
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="mt-5 flex flex-wrap justify-center gap-2">

@@ -272,7 +272,14 @@ export default function App() {
   // ── AI 关系助手独立页 ───────────────────────────────────────
   if (view === 'ai' && resultData) {
     return (
-      <AppShell headerNav={headerNav} compactMobileBottom>
+      <AppShell
+        headerNav={headerNav}
+        contentWidth="wide"
+        compactMobileBottom
+        flushTop
+        flushBottom
+        flushHorizontal
+      >
         <AnimatePresence mode="wait">
           <motion.div
             key="ai"

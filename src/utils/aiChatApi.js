@@ -5,7 +5,7 @@ function buildApiError(payload, fallbackMessage, status = 500) {
   return error
 }
 
-async function consumeSseResponse(response, onDelta) {
+async function consumeSseResponse(response, onDelta, signal) {
   if (!response.body) {
     throw buildApiError(null, 'AI 关系助手暂时没有回应，请稍后重试。', response.status || 502)
   }
@@ -27,43 +27,68 @@ async function consumeSseResponse(response, onDelta) {
   const decoder = new TextDecoder()
   let buffer = ''
   let finalMessage = ''
+  let abortHandler = null
 
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
+  if (signal) {
+    abortHandler = () => {
+      reader.cancel().catch(() => {})
+    }
+    if (signal.aborted) {
+      reader.cancel().catch(() => {})
+    } else {
+      signal.addEventListener('abort', abortHandler, { once: true })
+    }
+  }
 
-    buffer += decoder.decode(value, { stream: true })
-    const chunks = buffer.split('\n\n')
-    buffer = chunks.pop() || ''
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
 
-    for (const chunk of chunks) {
-      const line = chunk
-        .split('\n')
-        .map((entry) => entry.trim())
-        .find((entry) => entry.startsWith('data:'))
+      buffer += decoder.decode(value, { stream: true })
+      const chunks = buffer.split('\n\n')
+      buffer = chunks.pop() || ''
 
-      if (!line) continue
+      for (const chunk of chunks) {
+        const line = chunk
+          .split('\n')
+          .map((entry) => entry.trim())
+          .find((entry) => entry.startsWith('data:'))
 
-      let payload = null
-      try {
-        payload = JSON.parse(line.slice(5).trim())
-      } catch {
-        continue
-      }
+        if (!line) continue
 
-      if (payload?.error) {
-        throw buildApiError(payload, payload.error, payload.status || 500)
-      }
+        let payload = null
+        try {
+          payload = JSON.parse(line.slice(5).trim())
+        } catch {
+          continue
+        }
 
-      if (payload?.delta) {
-        finalMessage = payload.message || `${finalMessage}${payload.delta}`
-        onDelta?.(payload.delta, finalMessage)
-      }
+        if (payload?.error) {
+          throw buildApiError(payload, payload.error, payload.status || 500)
+        }
 
-      if (payload?.done && payload?.message) {
-        finalMessage = payload.message
+        if (payload?.delta) {
+          finalMessage = payload.message || `${finalMessage}${payload.delta}`
+          onDelta?.(payload.delta, finalMessage)
+        }
+
+        if (payload?.done && payload?.message) {
+          finalMessage = payload.message
+        }
       }
     }
+  } finally {
+    if (signal && abortHandler) {
+      signal.removeEventListener('abort', abortHandler)
+    }
+  }
+
+  if (signal?.aborted) {
+    const stopError = new Error('生成已停止')
+    stopError.code = 'aborted'
+    stopError.partial = finalMessage
+    throw stopError
   }
 
   if (!finalMessage.trim()) {
@@ -73,15 +98,26 @@ async function consumeSseResponse(response, onDelta) {
   return finalMessage
 }
 
-export async function sendAiChatMessage({ context, messages, onDelta }) {
-  const response = await fetch('/api/ai-chat', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'text/event-stream',
-    },
-    body: JSON.stringify({ context, messages }),
-  })
+export async function sendAiChatMessage({ context, messages, onDelta, signal }) {
+  let response
+  try {
+    response = await fetch('/api/ai-chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+      },
+      body: JSON.stringify({ context, messages }),
+      signal,
+    })
+  } catch (err) {
+    if (err?.name === 'AbortError') {
+      const stopError = new Error('生成已停止')
+      stopError.code = 'aborted'
+      throw stopError
+    }
+    throw err
+  }
 
-  return consumeSseResponse(response, onDelta)
+  return consumeSseResponse(response, onDelta, signal)
 }
