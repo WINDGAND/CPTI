@@ -8,6 +8,7 @@ import {
 import {
   buildDeepSeekMessages,
   normalizeAiChatPayload,
+  normalizeAssistantText,
   parseDeepSeekResponse,
   assertAiChatRateLimit,
 } from '../server/ai-chat-service.js'
@@ -185,6 +186,10 @@ test('parseDeepSeekResponse preserves paragraph and numbered line breaks', () =>
   assert.match(text, /\n\n1\./)
   assert.match(text, /2\. 第二点/)
   assert.equal(text.includes('总述一段。'), true)
+})
+
+test('normalizeAssistantText collapses excess blank lines for final SSE message', () => {
+  assert.equal(normalizeAssistantText('  line\n\n\n\nnext  '), 'line\n\nnext')
 })
 
 test('assertAiChatRateLimit rejects requests beyond the window allowance', () => {

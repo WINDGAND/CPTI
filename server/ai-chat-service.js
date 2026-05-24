@@ -344,8 +344,7 @@ export async function requestAiChatCompletionStream({
   timeoutMs = DEFAULT_TIMEOUT_MS,
   onDelta,
 }) {
-  let finalMessage = ''
-  await streamAiChatCompletionEvents({
+  return streamAiChatCompletionEvents({
     apiKey,
     baseUrl,
     model,
@@ -355,12 +354,10 @@ export async function requestAiChatCompletionStream({
     timeoutMs,
     onEvent: (event) => {
       if (event.delta) {
-        finalMessage = event.message
         onDelta?.(event.delta, event.message)
       }
     },
   })
-  return { message: finalMessage }
 }
 
 export function encodeSseEvent(payload) {

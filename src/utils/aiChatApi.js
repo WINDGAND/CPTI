@@ -6,7 +6,14 @@ function buildApiError(payload, fallbackMessage, status = 500) {
 }
 
 async function consumeSseResponse(response, onDelta) {
-  if (!response.ok || !response.body) {
+  if (!response.body) {
+    throw buildApiError(null, 'AI 关系助手暂时没有回应，请稍后重试。', response.status || 502)
+  }
+
+  const contentType = response.headers.get('content-type') || ''
+  const isEventStream = contentType.includes('text/event-stream')
+
+  if (!response.ok && !isEventStream) {
     let payload = null
     try {
       payload = await response.json()

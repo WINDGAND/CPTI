@@ -55,7 +55,6 @@ export default async function handler(req, res) {
     res.end()
   } catch (error) {
     const status = Number(error?.status) || 500
-    res.statusCode = status
     res.write(encodeSseEvent({
       error: error instanceof Error ? error.message : 'Unexpected error',
       code: error?.code || 'ai-chat-error',
