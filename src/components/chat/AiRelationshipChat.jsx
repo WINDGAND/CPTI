@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { motion } from 'framer-motion'
-import { MessageCircleHeart, RefreshCw, Send, Sparkles, Trash2 } from 'lucide-react'
+import { MessageCircleHeart, Send, Sparkles, Trash2 } from 'lucide-react'
 import { sendAiChatMessage } from '../../utils/aiChatApi'
 import { buildAiChatStorageKey, buildAiRelationshipContext } from '../../utils/aiChatContext'
+import AiMessageContent from './AiMessageContent'
 
 const MAX_LOCAL_MESSAGES = 16
 
@@ -41,24 +41,29 @@ function formatError(error) {
   return error?.message || 'AI 关系助手暂时没有回应，请稍后重试。'
 }
 
-function MessageBubble({ message }) {
+function MessageBubble({ message, isStreaming = false }) {
   const isUser = message.role === 'user'
+
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
         className={[
-          'max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-7 shadow-sm',
+          'max-w-[88%] rounded-2xl px-4 py-3 text-sm shadow-sm',
           isUser
-            ? 'rounded-br-sm text-white'
-            : 'rounded-bl-sm border border-white/70 bg-white/90 text-base-text',
+            ? 'rounded-br-sm bg-brand-cyan text-white'
+            : 'rounded-bl-sm border border-gray-100 bg-white text-base-text',
         ].join(' ')}
-        style={isUser ? { backgroundColor: 'var(--poster-accent)' } : undefined}
       >
-        {message.content.split('\n').map((line, index) => (
-          <p key={index} className={index > 0 ? 'mt-2' : ''}>
-            {line}
-          </p>
-        ))}
+        {isUser ? (
+          <AiMessageContent content={message.content} isUser />
+        ) : (
+          <>
+            <AiMessageContent content={message.content} />
+            {isStreaming && (
+              <span className="ml-1 inline-block h-4 w-0.5 animate-pulse bg-brand-cyan align-middle" aria-hidden />
+            )}
+          </>
+        )}
       </div>
     </div>
   )
@@ -71,6 +76,7 @@ export default function AiRelationshipChat({ resultData, className = '' }) {
   const [input, setInput] = useState('')
   const [error, setError] = useState('')
   const [isSending, setIsSending] = useState(false)
+  const [streamingMessageId, setStreamingMessageId] = useState(null)
   const messagesContainerRef = useRef(null)
   const shouldAutoScrollRef = useRef(false)
 
@@ -86,6 +92,7 @@ export default function AiRelationshipChat({ resultData, className = '' }) {
   useEffect(() => {
     setMessages(readStoredMessages(storageKey))
     setError('')
+    setStreamingMessageId(null)
   }, [storageKey])
 
   useEffect(() => {
@@ -105,35 +112,51 @@ export default function AiRelationshipChat({ resultData, className = '' }) {
         behavior: 'smooth',
       })
     })
-  }, [messages, isSending])
+  }, [messages, isSending, streamingMessageId])
 
   async function sendMessage(nextContent) {
     const content = String(nextContent ?? input).trim()
     if (!content || isSending) return
 
     const userMessage = createMessage('user', content)
-    const nextMessages = [...messages, userMessage].slice(-MAX_LOCAL_MESSAGES)
+    const assistantMessage = createMessage('assistant', '')
+    const nextMessages = [...messages, userMessage, assistantMessage].slice(-MAX_LOCAL_MESSAGES)
 
     shouldAutoScrollRef.current = true
     setMessages(nextMessages)
     setInput('')
     setError('')
     setIsSending(true)
+    setStreamingMessageId(assistantMessage.id)
 
     try {
       const assistantText = await sendAiChatMessage({
         context,
-        messages: nextMessages.map(({ role, content }) => ({ role, content })).slice(-6),
+        messages: [...messages, userMessage]
+          .map(({ role, content: messageContent }) => ({ role, content: messageContent }))
+          .slice(-6),
+        onDelta: (_delta, message) => {
+          shouldAutoScrollRef.current = true
+          setMessages((current) => current.map((entry) => (
+            entry.id === assistantMessage.id
+              ? { ...entry, content: message }
+              : entry
+          )))
+        },
       })
+
       shouldAutoScrollRef.current = true
-      setMessages((current) => [
-        ...current,
-        createMessage('assistant', assistantText),
-      ].slice(-MAX_LOCAL_MESSAGES))
+      setMessages((current) => current.map((entry) => (
+        entry.id === assistantMessage.id
+          ? { ...entry, content: assistantText }
+          : entry
+      )))
     } catch (err) {
+      setMessages((current) => current.filter((entry) => entry.id !== assistantMessage.id))
       setError(formatError(err))
     } finally {
       setIsSending(false)
+      setStreamingMessageId(null)
     }
   }
 
@@ -145,6 +168,7 @@ export default function AiRelationshipChat({ resultData, className = '' }) {
   function clearHistory() {
     setMessages([])
     setError('')
+    setStreamingMessageId(null)
     if (typeof window !== 'undefined') {
       window.localStorage.removeItem(storageKey)
     }
@@ -154,25 +178,19 @@ export default function AiRelationshipChat({ resultData, className = '' }) {
     <section
       id="ai-relationship-chat"
       className={[
-        'overflow-hidden rounded-[24px] border border-white/70 bg-white/80 shadow-card backdrop-blur',
+        'overflow-hidden rounded-[24px] border border-gray-100 bg-white shadow-card',
         className,
       ].join(' ')}
-      style={{
-        background: 'linear-gradient(145deg, color-mix(in srgb, var(--poster-accent) 14%, white), rgba(255,255,255,0.92) 52%, white)',
-      }}
     >
-      <div className="border-b border-white/80 px-4 py-5 sm:px-5">
+      <div className="border-b border-gray-100 px-4 py-5 sm:px-5">
         <div className="flex items-start gap-3">
-          <div
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-white shadow-sm"
-            style={{ backgroundColor: 'var(--poster-accent)' }}
-          >
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-cyan text-white shadow-sm">
             <MessageCircleHeart size={20} />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-base font-bold text-base-text">AI 关系助手</h3>
-              <span className="rounded-full bg-white/80 px-2 py-1 text-[10px] font-semibold text-base-mute">
+              <span className="rounded-full bg-brand-cyan/10 px-2 py-1 text-[10px] font-semibold text-brand-cyan">
                 基于 {context.code} 结果
               </span>
             </div>
@@ -183,7 +201,7 @@ export default function AiRelationshipChat({ resultData, className = '' }) {
           {messages.length > 0 && (
             <button
               type="button"
-              className="rounded-full p-2 text-base-mute transition-colors hover:bg-white hover:text-base-text"
+              className="rounded-full p-2 text-base-mute transition-colors hover:bg-gray-50 hover:text-base-text"
               onClick={clearHistory}
               aria-label="清空 AI 聊天记录"
             >
@@ -193,12 +211,12 @@ export default function AiRelationshipChat({ resultData, className = '' }) {
         </div>
       </div>
 
-      <div ref={messagesContainerRef} className="max-h-[520px] min-h-[260px] space-y-4 overflow-y-auto px-4 py-5 sm:px-5">
+      <div ref={messagesContainerRef} className="max-h-[520px] min-h-[260px] space-y-4 overflow-y-auto bg-gray-50/60 px-4 py-5 sm:px-5">
         {messages.length === 0 ? (
           <div className="space-y-4">
-            <div className="rounded-2xl border border-white/80 bg-white/70 p-4">
+            <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
               <div className="mb-2 flex items-center gap-2">
-                <Sparkles size={15} style={{ color: 'var(--poster-accent)' }} />
+                <Sparkles size={15} className="text-brand-cyan" />
                 <p className="text-sm font-semibold text-base-text">可以从这些问题开始</p>
               </div>
               <div className="flex flex-col gap-2">
@@ -206,7 +224,7 @@ export default function AiRelationshipChat({ resultData, className = '' }) {
                   <button
                     type="button"
                     key={suggestion}
-                    className="rounded-xl border border-gray-100 bg-white px-3 py-2.5 text-left text-xs leading-5 text-base-text transition-all hover:-translate-y-0.5 hover:shadow-sm disabled:opacity-50"
+                    className="rounded-xl border border-gray-100 bg-white px-3 py-2.5 text-left text-xs leading-5 text-base-text transition-all hover:-translate-y-0.5 hover:border-brand-cyan/20 hover:shadow-sm disabled:opacity-50"
                     onClick={() => sendMessage(suggestion)}
                     disabled={isSending}
                   >
@@ -220,22 +238,15 @@ export default function AiRelationshipChat({ resultData, className = '' }) {
             </p>
           </div>
         ) : (
-          messages.map((message) => (
-            <MessageBubble key={message.id} message={message} />
-          ))
-        )}
-
-        {isSending && (
-          <motion.div
-            className="flex justify-start"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <div className="inline-flex items-center gap-2 rounded-2xl rounded-bl-sm border border-white/70 bg-white/90 px-4 py-3 text-xs text-base-mute shadow-sm">
-              <RefreshCw size={14} className="animate-spin" />
-              正在结合你们的光谱结果思考...
-            </div>
-          </motion.div>
+          messages
+            .filter((message) => message.content || message.id === streamingMessageId)
+            .map((message) => (
+              <MessageBubble
+                key={message.id}
+                message={message}
+                isStreaming={message.id === streamingMessageId}
+              />
+            ))
         )}
       </div>
 
@@ -245,21 +256,20 @@ export default function AiRelationshipChat({ resultData, className = '' }) {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="border-t border-white/80 p-3 sm:p-4">
-        <div className="flex items-end gap-2 rounded-2xl border border-gray-100 bg-white p-2 shadow-sm focus-within:border-brand-cyan">
+      <form onSubmit={handleSubmit} className="border-t border-gray-100 bg-white p-3 sm:p-4">
+        <div className="flex items-end gap-2 rounded-2xl border border-gray-200 bg-white p-2 shadow-sm focus-within:border-brand-cyan">
           <textarea
             value={input}
             onChange={(event) => setInput(event.target.value)}
             placeholder="比如：我们总因为计划变化吵架，我该怎么开口？"
             rows={2}
             maxLength={800}
-            className="max-h-32 min-h-[44px] flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-6 text-base-text outline-none placeholder:text-gray-300"
+            className="max-h-32 min-h-[44px] flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-6 text-base-text outline-none placeholder:text-gray-400"
             disabled={isSending}
           />
           <button
             type="submit"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-            style={{ backgroundColor: 'var(--poster-accent)' }}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-cyan text-white transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
             disabled={!input.trim() || isSending}
             aria-label="发送给 AI 关系助手"
           >

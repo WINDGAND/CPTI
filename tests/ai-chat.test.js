@@ -166,22 +166,25 @@ test('buildDeepSeekMessages injects CPTI context and safety boundary', () => {
   assert.equal(messages[0].role, 'system')
   assert.match(messages[0].content, /CPTI/)
   assert.match(messages[0].content, /不要做心理诊断/)
+  assert.match(messages[0].content, /编号要点/)
   assert.match(messages[0].content, /SROD/)
   assert.equal(messages.at(-1).content, 'SROD 为什么容易因为计划吵架？')
 })
 
-test('parseDeepSeekResponse returns assistant text from OpenAI-compatible payload', () => {
+test('parseDeepSeekResponse preserves paragraph and numbered line breaks', () => {
   const text = parseDeepSeekResponse({
     choices: [
       {
         message: {
-          content: '可以先把计划变更翻译成“我仍然重视你”。',
+          content: '总述一段。\n\n1. 第一点：说明\n2. 第二点：说明\n\n最后建议。',
         },
       },
     ],
   })
 
-  assert.equal(text, '可以先把计划变更翻译成“我仍然重视你”。')
+  assert.match(text, /\n\n1\./)
+  assert.match(text, /2\. 第二点/)
+  assert.equal(text.includes('总述一段。'), true)
 })
 
 test('assertAiChatRateLimit rejects requests beyond the window allowance', () => {

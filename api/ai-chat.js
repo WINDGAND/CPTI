@@ -1,4 +1,7 @@
-import { requestAiChatCompletion } from '../server/ai-chat-service.js'
+import {
+  encodeSseEvent,
+  streamAiChatCompletionEvents,
+} from '../server/ai-chat-service.js'
 import {
   normalizeClientIp,
   sha256Hex,
@@ -33,23 +36,31 @@ export default async function handler(req, res) {
     return res.status(405).json({ ok: false, error: 'Method not allowed' })
   }
 
+  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8')
+  res.setHeader('Cache-Control', 'no-cache, no-transform')
+  res.setHeader('Connection', 'keep-alive')
+
   try {
-    const data = await requestAiChatCompletion({
+    await streamAiChatCompletionEvents({
       apiKey: process.env.DEEPSEEK_API_KEY,
       baseUrl: process.env.DEEPSEEK_BASE_URL,
       model: process.env.DEEPSEEK_MODEL,
       fetchImpl: fetch,
       body: readBody(req),
       fingerprintHash: await buildFingerprint(req),
+      onEvent: (event) => {
+        res.write(encodeSseEvent(event))
+      },
     })
-
-    return res.status(200).json({ ok: true, data })
+    res.end()
   } catch (error) {
     const status = Number(error?.status) || 500
-    return res.status(status).json({
-      ok: false,
+    res.statusCode = status
+    res.write(encodeSseEvent({
       error: error instanceof Error ? error.message : 'Unexpected error',
       code: error?.code || 'ai-chat-error',
-    })
+      status,
+    }))
+    res.end()
   }
 }

@@ -1,17 +1,11 @@
-import { requestAiChatCompletion } from '../../server/ai-chat-service.js'
+import {
+  encodeSseEvent,
+  streamAiChatCompletionEvents,
+} from '../../server/ai-chat-service.js'
 import {
   normalizeClientIp,
   sha256Hex,
 } from '../../server/stats-service.js'
-
-function jsonResponse(payload, init = {}) {
-  const headers = new Headers(init.headers || {})
-  headers.set('Content-Type', 'application/json; charset=utf-8')
-  return new Response(JSON.stringify(payload), {
-    ...init,
-    headers,
-  })
-}
 
 async function readBody(request) {
   try {
@@ -35,32 +29,52 @@ async function buildFingerprintHash(request) {
 
 export async function onRequest(context) {
   if (context.request.method !== 'POST') {
-    return jsonResponse(
-      { ok: false, error: 'Method not allowed' },
-      { status: 405, headers: { Allow: 'POST' } }
-    )
-  }
-
-  try {
-    const data = await requestAiChatCompletion({
-      apiKey: context.env.DEEPSEEK_API_KEY,
-      baseUrl: context.env.DEEPSEEK_BASE_URL,
-      model: context.env.DEEPSEEK_MODEL,
-      fetchImpl: fetch,
-      body: await readBody(context.request),
-      fingerprintHash: await buildFingerprintHash(context.request),
-    })
-
-    return jsonResponse({ ok: true, data }, { status: 200 })
-  } catch (error) {
-    const status = Number(error?.status) || 500
-    return jsonResponse(
-      {
-        ok: false,
-        error: error instanceof Error ? error.message : 'Unexpected error',
-        code: error?.code || 'ai-chat-error',
+    return new Response(JSON.stringify({ ok: false, error: 'Method not allowed' }), {
+      status: 405,
+      headers: {
+        Allow: 'POST',
+        'Content-Type': 'application/json; charset=utf-8',
       },
-      { status }
-    )
+    })
   }
+
+  const body = await readBody(context.request)
+  const fingerprintHash = await buildFingerprintHash(context.request)
+  const encoder = new TextEncoder()
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        await streamAiChatCompletionEvents({
+          apiKey: context.env.DEEPSEEK_API_KEY,
+          baseUrl: context.env.DEEPSEEK_BASE_URL,
+          model: context.env.DEEPSEEK_MODEL,
+          fetchImpl: fetch,
+          body,
+          fingerprintHash,
+          onEvent: (event) => {
+            controller.enqueue(encoder.encode(encodeSseEvent(event)))
+          },
+        })
+      } catch (error) {
+        const status = Number(error?.status) || 500
+        controller.enqueue(encoder.encode(encodeSseEvent({
+          error: error instanceof Error ? error.message : 'Unexpected error',
+          code: error?.code || 'ai-chat-error',
+          status,
+        })))
+      } finally {
+        controller.close()
+      }
+    },
+  })
+
+  return new Response(stream, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+    },
+  })
 }

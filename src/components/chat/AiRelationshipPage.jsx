@@ -1,12 +1,14 @@
 import { ArrowLeft, ClipboardList, MessageCircleHeart, Sparkles } from 'lucide-react'
 import { buildAiRelationshipContext } from '../../utils/aiChatContext'
+import { getResultThemeClass } from '../../utils/resultTheme'
 import AiRelationshipChat from './AiRelationshipChat'
 
 export default function AiRelationshipPage({ resultData, onBackToResult }) {
   const context = buildAiRelationshipContext(resultData)
+  const themeClass = getResultThemeClass(resultData)
 
   return (
-    <div className="pb-10">
+    <div className={`pb-10 ${themeClass}`}>
       <section className="relative overflow-hidden rounded-[28px] border border-white/80 bg-white p-5 shadow-card sm:p-7">
         <div
           className="absolute inset-0 opacity-80"

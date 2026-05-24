@@ -143,7 +143,12 @@ export function buildDeepSeekMessages({ context, messages }) {
     '回答必须结合 CPTI 类型、维度倾向、优势、挑战或冲突模式，避免泛泛而谈。',
     '不要做心理诊断，不要给医疗、法律、危机干预建议，不要武断建议分手，不要教用户操控伴侣。',
     '如果用户描述人身安全、自伤、自杀、暴力威胁等危机场景，先建议立刻联系现实中的可信赖人士、当地紧急服务或专业机构。',
-    '表达风格：简体中文，像温柔但清醒的关系教练；每次回答控制在 3-5 小段，必要时给 2-3 个可直接照着说的句子。',
+    '表达风格：简体中文，像温柔但清醒的关系教练。',
+    '输出结构（必须遵守）：',
+    '1. 先用 1-2 句话总述核心观点。',
+    '2. 中间用 2-4 条编号要点展开，每条单独一行，格式为「1. 小标题：具体说明」。',
+    '3. 最后用 1 句话给出今晚就能试的小建议。',
+    '4. 段落之间必须空一行；禁止把多个要点挤在同一段里；不要输出 # 标题语法。',
     '',
     '当前 CPTI 关系上下文如下：',
     formatContextForPrompt(context),
@@ -155,13 +160,57 @@ export function buildDeepSeekMessages({ context, messages }) {
   ]
 }
 
-export function parseDeepSeekResponse(payload) {
-  const content = payload?.choices?.[0]?.message?.content
-  const text = compactText(content, 4000)
+export function normalizeAssistantText(content, maxLength = 4000) {
+  const text = String(content ?? '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+    .slice(0, maxLength)
+
   if (!text) {
     throw createHttpError(502, 'AI response is empty', 'ai-empty-response')
   }
+
   return text
+}
+
+export function parseDeepSeekResponse(payload) {
+  return normalizeAssistantText(payload?.choices?.[0]?.message?.content)
+}
+
+export async function* iterateDeepSeekStream(response) {
+  if (!response?.body) {
+    throw createHttpError(502, 'DeepSeek stream body is missing', 'deepseek-stream-missing')
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() || ''
+
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (!trimmed.startsWith('data:')) continue
+
+      const data = trimmed.slice(5).trim()
+      if (!data || data === '[DONE]') continue
+
+      try {
+        const parsed = JSON.parse(data)
+        const delta = parsed?.choices?.[0]?.delta?.content
+        if (delta) yield delta
+      } catch {
+        // Ignore malformed stream chunks.
+      }
+    }
+  }
 }
 
 export function assertAiChatRateLimit({
@@ -200,6 +249,36 @@ function buildEndpoint(baseUrl) {
   return `${String(baseUrl || DEFAULT_DEEPSEEK_BASE_URL).replace(/\/+$/, '')}/chat/completions`
 }
 
+function buildDeepSeekRequestBody(normalized, model, stream = false) {
+  return {
+    model: model || DEFAULT_DEEPSEEK_MODEL,
+    messages: buildDeepSeekMessages(normalized),
+    temperature: 0.7,
+    max_tokens: 900,
+    stream,
+  }
+}
+
+async function postDeepSeek({
+  apiKey,
+  baseUrl,
+  model,
+  fetchImpl,
+  normalized,
+  stream = false,
+  signal,
+}) {
+  return (fetchImpl ?? fetch)(buildEndpoint(baseUrl), {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(buildDeepSeekRequestBody(normalized, model, stream)),
+    signal,
+  })
+}
+
 export async function requestAiChatCompletion({
   apiKey,
   baseUrl = DEFAULT_DEEPSEEK_BASE_URL,
@@ -219,18 +298,13 @@ export async function requestAiChatCompletion({
   const timer = setTimeout(() => controller.abort(), timeoutMs)
 
   try {
-    const response = await (fetchImpl ?? fetch)(buildEndpoint(baseUrl), {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: model || DEFAULT_DEEPSEEK_MODEL,
-        messages: buildDeepSeekMessages(normalized),
-        temperature: 0.7,
-        max_tokens: 900,
-      }),
+    const response = await postDeepSeek({
+      apiKey,
+      baseUrl,
+      model,
+      fetchImpl,
+      normalized,
+      stream: false,
       signal: controller.signal,
     })
 
@@ -250,6 +324,102 @@ export async function requestAiChatCompletion({
     }
 
     return { message: parseDeepSeekResponse(payload) }
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw createHttpError(504, 'DeepSeek request timed out', 'deepseek-timeout')
+    }
+    throw error
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+export async function requestAiChatCompletionStream({
+  apiKey,
+  baseUrl = DEFAULT_DEEPSEEK_BASE_URL,
+  model = DEFAULT_DEEPSEEK_MODEL,
+  fetchImpl,
+  body,
+  fingerprintHash,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  onDelta,
+}) {
+  let finalMessage = ''
+  await streamAiChatCompletionEvents({
+    apiKey,
+    baseUrl,
+    model,
+    fetchImpl,
+    body,
+    fingerprintHash,
+    timeoutMs,
+    onEvent: (event) => {
+      if (event.delta) {
+        finalMessage = event.message
+        onDelta?.(event.delta, event.message)
+      }
+    },
+  })
+  return { message: finalMessage }
+}
+
+export function encodeSseEvent(payload) {
+  return `data: ${JSON.stringify(payload)}\n\n`
+}
+
+export async function streamAiChatCompletionEvents({
+  apiKey,
+  baseUrl = DEFAULT_DEEPSEEK_BASE_URL,
+  model = DEFAULT_DEEPSEEK_MODEL,
+  fetchImpl,
+  body,
+  fingerprintHash,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  onEvent,
+}) {
+  if (!apiKey) {
+    throw createHttpError(500, 'DeepSeek API key is missing', 'deepseek-key-missing')
+  }
+
+  const normalized = normalizeAiChatPayload(body)
+  assertAiChatRateLimit({ fingerprintHash })
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+
+  try {
+    const response = await postDeepSeek({
+      apiKey,
+      baseUrl,
+      model,
+      fetchImpl,
+      normalized,
+      stream: true,
+      signal: controller.signal,
+    })
+
+    if (!response.ok) {
+      let payload = null
+      try {
+        payload = await response.json()
+      } catch {
+        payload = null
+      }
+      throw createHttpError(
+        response.status,
+        payload?.error?.message || 'DeepSeek request failed',
+        'deepseek-request-failed'
+      )
+    }
+
+    let message = ''
+    for await (const delta of iterateDeepSeekStream(response)) {
+      message += delta
+      onEvent?.({ delta, message })
+    }
+
+    const finalMessage = normalizeAssistantText(message)
+    onEvent?.({ done: true, message: finalMessage })
+    return { message: finalMessage }
   } catch (error) {
     if (error?.name === 'AbortError') {
       throw createHttpError(504, 'DeepSeek request timed out', 'deepseek-timeout')
