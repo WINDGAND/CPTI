@@ -604,22 +604,26 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
             </div>
           )}
 
-          {/* 跳到最新浮标 */}
+          {/* 跳到最新浮标 — flex 居中，避免 motion 的 transform 覆盖 translate-x */}
           <AnimatePresence>
             {showJumpToBottom && (
-              <motion.button
+              <motion.div
                 key="jump-bottom"
-                type="button"
-                onClick={scrollToBottom}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 10 }}
                 transition={{ duration: 0.2 }}
-                className="pointer-events-auto sticky bottom-3 left-1/2 z-10 -translate-x-1/2 inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-[11.5px] font-semibold text-base-text shadow-md hover:bg-white"
+                className="pointer-events-none sticky bottom-3 z-10 flex w-full justify-center"
               >
-                <ArrowDown size={12} />
-                跳到最新
-              </motion.button>
+                <button
+                  type="button"
+                  onClick={scrollToBottom}
+                  className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-[11.5px] font-semibold text-base-text shadow-md hover:bg-white"
+                >
+                  <ArrowDown size={12} />
+                  跳到最新
+                </button>
+              </motion.div>
             )}
           </AnimatePresence>
         </div>
