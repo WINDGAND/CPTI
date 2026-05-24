@@ -247,7 +247,7 @@ export default function App() {
   // ── 结果海报 ───────────────────────────────────────────────
   if (view === 'result' && resultData) {
     return (
-      <AppShell headerNav={headerNav} contentWidth="wide">
+      <AppShell headerNav={headerNav} contentWidth="wide" flushTop>
         <AnimatePresence mode="wait">
           <motion.div
             key="result"
@@ -312,9 +312,30 @@ export default function App() {
         <HelpPage onStartTest={goQuizHome} />
       ) : (
         <>
-          <div className="pt-4 pb-4 text-center md:pt-8">
-            <h1 className="text-h1 mb-2">CPTI 亲密光谱测试</h1>
-            <p className="text-mute">一个人先看你眼中的我们，两个人拼出真正的我们。</p>
+          <div className="pt-4 pb-5 text-center md:pt-10 md:pb-7">
+            <p className="text-eyebrow mb-2">Intimacy Spectrum Test · CPTI</p>
+            <h1 className="text-2xl md:text-[34px] font-extrabold leading-tight mb-3 text-base-text">
+              <span className="cpti-word font-display" aria-label="CPTI">
+                <span className="cpti-gradient-bg" aria-hidden>
+                  {['C', 'P', 'T', 'I'].map((char) => (
+                    <span key={`g-${char}`}>{char}</span>
+                  ))}
+                </span>
+                {['C', 'P', 'T', 'I'].map((char, i) => (
+                  <span
+                    key={char}
+                    className="cpti-letter"
+                    style={{ '--i': i }}
+                  >
+                    {char}
+                  </span>
+                ))}
+              </span>
+              <span> 亲密光谱测试</span>
+            </h1>
+            <p className="text-mute mx-auto max-w-xl">
+              一个人先看你眼中的我们，两个人拼出真正的我们。
+            </p>
           </div>
 
           <HomeStepCards />

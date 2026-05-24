@@ -35,6 +35,7 @@ export default {
       },
       fontFamily: {
         sans: ['"Noto Sans SC"', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        display: ['"Bricolage Grotesque"', '"Noto Sans SC"', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
       // 顶栏高度与 Logo 尺寸补充（Tailwind 默认无 h-13 / h-18）
       spacing: {

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { ChevronDown, ArrowRight } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
 
 const FAQ_GROUPS = [
   {
@@ -93,7 +94,7 @@ function StartTestButton({ onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex items-center justify-center gap-2 rounded-full bg-brand-cyan px-7 py-3 text-sm font-semibold text-white shadow-md transition hover:opacity-90 active:scale-[0.98]"
+      className="inline-flex items-center justify-center gap-2 rounded-full bg-brand-cyan px-7 py-3 text-sm font-semibold text-white shadow-[0_12px_30px_-12px_rgba(66,152,180,0.7)] transition-all duration-200 hover:opacity-95 hover:-translate-y-0.5 active:scale-[0.98]"
     >
       开始测试
       <ArrowRight className="h-4 w-4 shrink-0" strokeWidth={2.5} aria-hidden />
@@ -101,39 +102,69 @@ function StartTestButton({ onClick }) {
   )
 }
 
-function FAQItem({ item, expanded, onToggle }) {
+function FAQItem({ item, index, expanded, onToggle }) {
   const contentId = `${item.id}-content`
   return (
-    <article className="rounded-card border border-gray-100 bg-white shadow-card">
+    <div
+      className={[
+        'relative border-t border-gray-100 last:border-b last:border-gray-100',
+        'transition-colors duration-200',
+        expanded ? 'bg-brand-cyan/[0.025]' : '',
+      ].join(' ')}
+    >
+      {/* 左侧主题色短色条（展开时显示） */}
+      <span
+        className={[
+          'absolute left-0 top-3 bottom-3 w-[2px] rounded-full bg-brand-cyan transition-all duration-300',
+          expanded ? 'opacity-100' : 'opacity-0',
+        ].join(' ')}
+        aria-hidden
+      />
       <h3>
         <button
           type="button"
-          className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left"
+          className="group flex w-full items-start gap-3 py-4 pl-4 pr-2 text-left"
           onClick={onToggle}
           aria-expanded={expanded}
           aria-controls={contentId}
         >
-          <span className="text-sm font-semibold leading-relaxed text-base-text">
+          <span className="font-display text-xs font-bold tabular-nums text-base-mute shrink-0 mt-0.5 w-7">
+            {String(index + 1).padStart(2, '0')}
+          </span>
+          <span className="text-sm font-semibold leading-relaxed text-base-text flex-1 group-hover:text-brand-cyan transition-colors">
             {item.question}
           </span>
           <ChevronDown
             className={[
-              'h-4 w-4 shrink-0 text-base-mute transition-transform duration-200',
-              expanded ? 'rotate-180' : 'rotate-0',
+              'h-4 w-4 shrink-0 mt-1 text-base-mute transition-transform duration-300',
+              expanded ? 'rotate-180 text-brand-cyan' : 'rotate-0',
             ].join(' ')}
             aria-hidden
           />
         </button>
       </h3>
-      {expanded && (
-        <div id={contentId} className="border-t border-gray-100 px-4 py-4">
-          <p className="text-sm leading-relaxed text-base-text">{item.answer}</p>
-          <p className="mt-2 text-xs leading-relaxed text-base-mute">
-            你可以这样做：{item.action}
-          </p>
-        </div>
-      )}
-    </article>
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            id={contentId}
+            key="content"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.28, ease: [0.16, 0.84, 0.34, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="pl-[2.75rem] pr-2 pb-4">
+              <p className="text-sm leading-relaxed text-base-text">{item.answer}</p>
+              <p className="mt-2 text-xs leading-relaxed text-base-mute">
+                <span className="text-eyebrow mr-1.5">Try this</span>
+                {item.action}
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   )
 }
 
@@ -147,26 +178,32 @@ export default function FAQPage({ onStartTest }) {
 
   return (
     <div className="pb-10">
-      <header className="pt-4 pb-6 text-center md:pt-8">
-        <h1 className="mt-3 text-h1">关于 CPTI 的高频问题</h1>
-        <p className="mx-auto mt-2 max-w-2xl text-sm leading-relaxed text-base-mute">
+      <header className="pt-4 pb-7 text-center md:pt-8">
+        <p className="text-eyebrow">CPTI · FAQ</p>
+        <h1 className="mt-2 text-2xl md:text-[30px] font-extrabold leading-tight text-base-text">关于 CPTI 的高频问题</h1>
+        <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-base-mute">
           <span className="block">从产品理念到使用细节，这里整理了最常见的疑问。</span>
           <span className="block">看完后，你会更清楚如何理解结果、如何用结果促进沟通。</span>
         </p>
       </header>
 
-      <div className="space-y-6">
+      <div className="space-y-8">
         {FAQ_GROUPS.map((group) => (
-          <section key={group.id} className="space-y-3">
-            <div>
-              <h2 className="text-h2">{group.title}</h2>
-              <p className="mt-1 text-sm text-base-mute">{group.description}</p>
+          <section key={group.id}>
+            <div className="flex items-start gap-3 mb-2">
+              <span className="mt-1 h-6 w-[3px] shrink-0 rounded-full bg-brand-cyan" aria-hidden />
+              <div>
+                <p className="text-eyebrow">{group.id === 'macro' ? 'Concept' : 'How to use'}</p>
+                <h2 className="mt-1 text-lg md:text-xl font-bold text-base-text leading-snug">{group.title}</h2>
+                <p className="mt-1 text-sm text-base-mute">{group.description}</p>
+              </div>
             </div>
-            <div className="space-y-2.5">
-              {group.items.map((item) => (
+            <div className="mt-3">
+              {group.items.map((item, idx) => (
                 <FAQItem
                   key={item.id}
                   item={item}
+                  index={idx}
                   expanded={expandedId === item.id}
                   onToggle={() => toggleItem(item.id)}
                 />
@@ -176,8 +213,8 @@ export default function FAQPage({ onStartTest }) {
         ))}
       </div>
 
-      <footer className="pt-8 text-center">
-        <p className="mb-4 text-sm text-base-mute">
+      <footer className="pt-10 text-center">
+        <p className="mb-5 text-sm text-base-mute">
           准备好了就开始测试，结果会比“只看文字解释”更直观。
         </p>
         <StartTestButton onClick={onStartTest} />

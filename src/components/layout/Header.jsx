@@ -8,10 +8,26 @@ import { useFeedback } from '../feedback/FeedbackContext'
 const NAV_ITEMS = [
   { id: 'home', label: '首页', icon: Home },
   { id: 'types', label: '情侣类型', icon: HeartHandshake },
-  { id: 'ai', label: 'AI', icon: MessageCircleHeart, featured: true },
+  {
+    id: 'ai',
+    label: '关系助手',
+    labelDesktop: 'AI 关系助手',
+    ariaLabel: 'AI 关系助手',
+    icon: MessageCircleHeart,
+    featured: true,
+  },
   { id: 'stats', label: '统计', icon: BarChart3 },
   { id: 'help', label: '帮助', icon: CircleHelp },
 ]
+
+function getNavDisplayLabel(item, { desktop = false } = {}) {
+  if (desktop && item.labelDesktop) return item.labelDesktop
+  return item.label
+}
+
+function getNavAriaLabel(item) {
+  return item.ariaLabel ?? item.labelDesktop ?? item.label
+}
 
 export default function Header({
   activeTab,
@@ -68,10 +84,10 @@ export default function Header({
             className="h-9 w-9 shrink-0 sm:h-11 sm:w-11 lg:h-13 lg:w-13 object-contain"
           />
           <span
-            className="min-w-0 font-bold tracking-tight text-base lg:text-lg leading-tight bg-clip-text text-transparent"
+            className="logo-gradient-flow font-display min-w-0 font-extrabold tracking-tight text-base lg:text-lg leading-tight bg-clip-text text-transparent"
             style={{
               backgroundImage:
-                'linear-gradient(to right, #F4A7B0, #8ED6B4, #76B8E0, #B8A0D0)',
+                'linear-gradient(90deg, #F4A7B0 0%, #8ED6B4 33%, #76B8E0 66%, #B8A0D0 100%)',
             }}
           >
             Couple Type Indicator
@@ -97,11 +113,13 @@ export default function Header({
             const homeNudgeClass = item.id === 'home' ? '-translate-y-px' : ''
             const baseClass = [
               item.featured
-                ? 'inline-flex h-10 items-center gap-2 rounded-full px-4 leading-none text-sm lg:text-base font-bold shadow-sm ring-1 transition-all duration-150'
-                : 'inline-flex h-8 items-center gap-1.5 leading-none text-sm lg:text-base transition-colors duration-150',
+                ? 'inline-flex h-10 items-center gap-2 rounded-full px-4 leading-none text-sm lg:text-base font-bold transition-all duration-200'
+                : 'relative inline-flex h-8 items-center gap-1.5 leading-none text-sm lg:text-base transition-colors duration-150',
               item.featured
-                ? (isActive ? 'bg-brand-cyan text-white ring-brand-cyan' : 'bg-brand-cyan/10 text-brand-cyan ring-brand-cyan/15 hover:bg-brand-cyan hover:text-white')
-                : (isActive ? 'text-brand-cyan font-semibold' : 'text-base-mute hover:text-brand-cyan'),
+                ? (isActive
+                    ? 'bg-brand-cyan text-white shadow-[0_8px_24px_-8px_rgba(66,152,180,0.6)]'
+                    : 'bg-brand-cyan/10 text-brand-cyan hover:bg-brand-cyan hover:text-white hover:shadow-[0_8px_24px_-8px_rgba(66,152,180,0.55)]')
+                : (isActive ? 'text-brand-cyan font-semibold ed-tab-active' : 'text-base-mute hover:text-brand-cyan'),
             ].join(' ')
 
             if (item.id === 'types') {
@@ -117,12 +135,12 @@ export default function Header({
                     className={baseClass}
                     onClick={() => handleNavigate(item.id)}
                     aria-current={isActive ? 'page' : undefined}
-                    aria-label={item.label}
+                    aria-label={getNavAriaLabel(item)}
                   >
                     <span className={['inline-flex h-4 w-4 shrink-0 items-center justify-center', homeNudgeClass].join(' ')}>
                       <Icon size={15} className="-translate-y-px" aria-hidden />
                     </span>
-                    <span className={['leading-none', homeNudgeClass].join(' ')}>{item.label}</span>
+                    <span className={['leading-none', homeNudgeClass].join(' ')}>{getNavDisplayLabel(item, { desktop: true })}</span>
                   </button>
                   <AnimatePresence>
                     {typesOpen && (
@@ -180,16 +198,27 @@ export default function Header({
                 className={baseClass}
                 onClick={() => handleNavigate(item.id)}
                 aria-current={isActive ? 'page' : undefined}
-                aria-label={item.label}
+                aria-label={getNavAriaLabel(item)}
               >
                 <span className={['inline-flex h-4 w-4 shrink-0 items-center justify-center', homeNudgeClass].join(' ')}>
                   <Icon size={15} className="-translate-y-px" aria-hidden />
                 </span>
-                <span className={['leading-none', homeNudgeClass].join(' ')}>{item.label}</span>
+                <span className={['leading-none', homeNudgeClass].join(' ')}>{getNavDisplayLabel(item, { desktop: true })}</span>
               </button>
             )
           })}
         </nav>
+
+        {/* ── 桌面端反馈入口（顶栏右上角） ── */}
+        <button
+          type="button"
+          onClick={openFeedback}
+          className="hidden md:inline-flex ml-auto shrink-0 items-center gap-1.5 rounded-full px-3 h-10 text-sm text-base-mute hover:text-brand-cyan hover:bg-brand-cyan/10 transition-colors relative z-10"
+          aria-label="问题反馈"
+        >
+          <MessageSquarePlus size={16} aria-hidden />
+          <span className="font-medium leading-none">反馈</span>
+        </button>
       </div>
 
       {/* ── 移动端固定底部导航 ── */}
@@ -216,7 +245,7 @@ export default function Header({
                 ].join(' ')}
                 onClick={() => handleNavigate(item.id)}
                 aria-current={isActive ? 'page' : undefined}
-                aria-label={item.label}
+                aria-label={getNavAriaLabel(item)}
               >
                 <span
                   className={[
@@ -228,8 +257,8 @@ export default function Header({
                 >
                   <Icon size={item.featured ? 23 : 16} className="-translate-y-px" aria-hidden />
                 </span>
-                <span className={[item.featured ? 'text-[12px] font-bold leading-none' : 'text-[11px] leading-none font-medium', homeNudgeClass].join(' ')}>
-                  {item.label}
+                <span className={[item.featured ? 'text-[11px] font-bold leading-none' : 'text-[11px] leading-none font-medium', homeNudgeClass].join(' ')}>
+                  {getNavDisplayLabel(item)}
                 </span>
               </button>
             )

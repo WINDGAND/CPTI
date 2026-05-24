@@ -296,35 +296,60 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
       <div ref={posterRef} className={`cpti-poster ${result.themeClass}`}>
 
         <div
-          className="cpti-result-hero-bleed shadow-[0_4px_24px_rgba(0,0,0,0.08)]"
+          className="cpti-result-hero-bleed hero-band-reveal shadow-[0_4px_24px_rgba(0,0,0,0.08)]"
           style={{
             backgroundColor: 'color-mix(in srgb, var(--poster-accent) 48%, #221e2e)',
           }}
         >
           <div className="mx-auto max-w-6xl xl:max-w-7xl 2xl:max-w-[min(100%,90rem)] px-4 md:px-8 lg:px-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8 lg:gap-14 pt-8 pb-2 md:pt-12 md:pb-3">
             <div className="text-center lg:text-left space-y-2 md:space-y-3 lg:max-w-xl shrink-0">
-              <p className="text-xs text-white/75 tracking-wide">
-                {isDualMode ? '你们共同拼出的 CPTI 报告' : '你眼中的关系感知报告'}
-              </p>
+              <motion.p
+                className="font-display text-[11px] uppercase tracking-[0.22em] text-white/85"
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.45, duration: 0.4 }}
+              >
+                {isDualMode ? 'CPTI · Couple Report' : 'CPTI · Perception Report'}
+              </motion.p>
               <p className="text-sm sm:text-base font-semibold text-white leading-snug break-words">
                 {isDualMode
                   ? `【${n1} & ${n2}】的亲密关系体检报告`
                   : `【${n2}】眼中的关系感知画像`}
               </p>
-              <motion.div
-                className="text-[48px] min-[360px]:text-[56px] sm:text-[64px] lg:text-[72px] font-black leading-none tracking-wide text-white pt-1 drop-shadow-sm"
-                initial={{ scale: 0.85, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ type: 'spring', stiffness: 200, damping: 16 }}
+              {/* 字母代码 — 逐字 stagger 入场 */}
+              <div className="font-display text-[48px] min-[360px]:text-[56px] sm:text-[64px] lg:text-[80px] font-black leading-none tracking-[0.06em] text-white pt-1 drop-shadow-sm flex justify-center lg:justify-start">
+                {result.code.split('').map((letter, idx) => (
+                  <motion.span
+                    key={`${letter}-${idx}`}
+                    initial={{ opacity: 0, y: 20, scale: 0.7 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{
+                      delay: 0.5 + idx * 0.08,
+                      duration: 0.5,
+                      ease: [0.16, 1.2, 0.34, 1],
+                    }}
+                    className="inline-block"
+                  >
+                    {letter}
+                  </motion.span>
+                ))}
+              </div>
+              <motion.h2
+                className="text-xl sm:text-2xl lg:text-3xl font-bold text-white leading-tight"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.9, duration: 0.45 }}
               >
-                {result.code}
-              </motion.div>
-              <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white leading-tight">
                 {result.title}
-              </h2>
-              <p className="text-sm sm:text-base text-white/85 italic max-w-prose mx-auto lg:mx-0">
+              </motion.h2>
+              <motion.p
+                className="text-sm sm:text-base text-white/85 italic max-w-prose mx-auto lg:mx-0"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 1.05, duration: 0.4 }}
+              >
                 {result.slogan}
-              </p>
+              </motion.p>
             </div>
             <div className="flex justify-center lg:justify-end lg:flex-1 min-w-0 pb-2">
               <ResultHeroIllustration code={result.code} />
@@ -652,47 +677,12 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
       </div>
 
       {/* ══════════════════════════════════════════════
-          海报区域外：昵称输入 + 操作（不参与截图）
+          海报区域外：昵称 → 分享 → AI（不参与截图）
       ══════════════════════════════════════════════ */}
 
       <div className="my-8 h-px bg-gray-200" />
 
-      <div className={result.themeClass}>
-        <div className="overflow-hidden rounded-[24px] border border-gray-100 bg-white shadow-card">
-          <div className="bg-gradient-to-r from-brand-cyan/10 via-white to-white p-4 sm:p-5">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-start gap-3">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-cyan text-white shadow-sm">
-                  <MessageCircleHeart size={21} aria-hidden />
-                </span>
-                <div>
-                  <div className="mb-1 flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-bold text-base-text">想继续聊聊这份报告？</p>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-brand-cyan/10 px-2 py-1 text-[10px] font-semibold text-brand-cyan">
-                      <Sparkles size={12} aria-hidden />
-                      基于 {result.code}
-                    </span>
-                  </div>
-                  <p className="text-xs leading-6 text-base-mute">
-                    AI 关系助手已为你准备好独立聊天页，会带着当前类型、四维光谱和冲突模式继续回答具体问题。
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={onOpenAi}
-                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-brand-cyan px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:opacity-90"
-              >
-                进入 AI 聊天页
-                <ArrowRight size={16} aria-hidden />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="my-8 h-px bg-gray-200" />
-
+      {/* 1. 昵称 + 生成报告 */}
       <div className="space-y-3">
         <div>
           <p className="text-sm font-semibold text-base-text">
@@ -740,7 +730,20 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
           </button>
         )}
 
-        {!isDualMode && (
+        {isDualMode && (
+          <button
+            className="btn-primary w-full py-3 text-sm"
+            onClick={handleGenerate}
+          >
+            跳过，直接生成双人报告 ↑
+          </button>
+        )}
+      </div>
+
+      {/* 2. 邀请 TA / 分享链接（单人模式） */}
+      {!isDualMode && (
+        <>
+          <div className="my-8 h-px bg-gray-200" />
           <div className="rounded-card border border-brand-purple/15 bg-brand-purple/5 p-4">
             <p className="text-sm font-semibold text-base-text">下一步建议：邀请 TA 一起拼图</p>
             <p className="mt-1 text-xs leading-relaxed text-base-mute">
@@ -798,16 +801,44 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
                   : ' '}
             </p>
           </div>
-        )}
+        </>
+      )}
 
-        {isDualMode && (
-          <button
-            className="btn-primary w-full py-3 text-sm"
-            onClick={handleGenerate}
-          >
-            跳过，直接生成双人报告 ↑
-          </button>
-        )}
+      {/* 3. AI 关系助手 */}
+      <div className="my-8 h-px bg-gray-200" />
+
+      <div className={result.themeClass}>
+        <div className="overflow-hidden rounded-[24px] border border-gray-100 bg-white shadow-card">
+          <div className="bg-gradient-to-r from-brand-cyan/10 via-white to-white p-4 sm:p-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-cyan text-white shadow-sm">
+                  <MessageCircleHeart size={21} aria-hidden />
+                </span>
+                <div>
+                  <div className="mb-1 flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-bold text-base-text">想继续聊聊这份报告？</p>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-brand-cyan/10 px-2 py-1 text-[10px] font-semibold text-brand-cyan">
+                      <Sparkles size={12} aria-hidden />
+                      基于 {result.code}
+                    </span>
+                  </div>
+                  <p className="text-xs leading-6 text-base-mute">
+                    AI 关系助手已为你准备好独立聊天页，会带着当前类型、四维光谱和冲突模式继续回答具体问题。
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={onOpenAi}
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-brand-cyan px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:opacity-90"
+              >
+                进入 AI 聊天页
+                <ArrowRight size={16} aria-hidden />
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="mt-5 text-center space-y-1">

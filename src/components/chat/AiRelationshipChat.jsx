@@ -48,12 +48,19 @@ function MessageBubble({ message, isStreaming = false }) {
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
         className={[
-          'max-w-[88%] rounded-2xl px-4 py-3 text-sm shadow-sm',
+          'relative max-w-[88%] rounded-2xl px-4 py-3 text-sm shadow-sm',
           isUser
             ? 'rounded-br-sm bg-brand-cyan text-white'
             : 'rounded-bl-sm border border-gray-100 bg-white text-base-text',
         ].join(' ')}
       >
+        {!isUser && (
+          <span
+            className="absolute left-0 top-3 bottom-3 w-[2px] rounded-full"
+            style={{ background: 'var(--poster-accent, #4298b4)', opacity: 0.7 }}
+            aria-hidden
+          />
+        )}
         {isUser ? (
           <AiMessageContent content={message.content} isUser />
         ) : (

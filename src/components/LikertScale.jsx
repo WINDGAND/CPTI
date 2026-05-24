@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { RAW_VALUES } from '../utils/scoring'
 
@@ -59,7 +59,15 @@ export default function LikertScale({
   rightLabel = '不认同',
 }) {
   const [hovered, setHovered] = useState(null)
+  // ripple key — 每次点击都生成一个新值以便重置 ripple 动画
+  const [rippleSeed, setRippleSeed] = useState({ idx: null, key: 0 })
+  const seedCounter = useRef(0)
   const isDesktop = useIsDesktop()
+
+  function fireRipple(idx) {
+    seedCounter.current += 1
+    setRippleSeed({ idx, key: seedCounter.current })
+  }
 
   return (
     <div className="w-full select-none">
@@ -83,13 +91,19 @@ export default function LikertScale({
           const score      = RAW_VALUES[idx]
           const checkSize  = Math.round(size * 0.42)
 
+          const showRipple = rippleSeed.idx === idx && isSelected
+
           return (
             <motion.button
               key={idx}
               type="button"
               aria-label={`选项 ${score > 0 ? '+' : ''}${score}`}
               aria-pressed={isSelected}
-              onClick={() => { setHovered(null); onChange?.(idx, score) }}
+              onClick={() => {
+                setHovered(null)
+                fireRipple(idx)
+                onChange?.(idx, score)
+              }}
               onMouseEnter={() => setHovered(idx)}
               onMouseLeave={() => setHovered(null)}
               onPointerLeave={() => setHovered(null)}
@@ -106,15 +120,23 @@ export default function LikertScale({
                 cursor:          'pointer',
                 outline:         'none',
                 padding:         0,
+                position:        'relative',
                 display:         'flex',
                 alignItems:      'center',
                 justifyContent:  'center',
                 transition:      'background-color 0.15s ease',
                 flexShrink:      0,
+                color:           cfg.fillColor,
               }}
-              whileTap={{ scale: 0.92 }}
-              transition={{ duration: 0.1 }}
+              whileTap={{ scale: 0.88 }}
+              animate={isSelected ? { scale: [1, 1.12, 1] } : { scale: 1 }}
+              transition={isSelected
+                ? { duration: 0.4, ease: [0.34, 1.56, 0.64, 1] }
+                : { duration: 0.15 }}
             >
+              {/* ripple 水波 — 仅在刚选中时播放一次 */}
+              {showRipple && <span key={rippleSeed.key} className="ripple-burst" aria-hidden />}
+
               <AnimatePresence>
                 {filled && (
                   <motion.svg
@@ -123,11 +145,11 @@ export default function LikertScale({
                     height={checkSize}
                     viewBox="0 0 12 10"
                     fill="none"
-                    initial={{ opacity: 0, scale: 0.5 }}
+                    initial={{ opacity: 0, scale: 0.4 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.5 }}
-                    transition={{ duration: 0.15 }}
-                    style={{ pointerEvents: 'none', flexShrink: 0 }}
+                    transition={{ duration: 0.18, ease: [0.34, 1.56, 0.64, 1] }}
+                    style={{ pointerEvents: 'none', flexShrink: 0, position: 'relative', zIndex: 1 }}
                   >
                     <polyline
                       points="1.5,5 4.5,8.5 10.5,1.5"

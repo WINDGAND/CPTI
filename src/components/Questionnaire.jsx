@@ -757,16 +757,27 @@ export default function Questionnaire({ onComplete }) {
         </div>
       )}
 
-      {/* ── 始终可见的 sticky 进度条 ── */}
-      <div className="sticky top-16 sm:top-[4.5rem] lg:top-20 z-40 bg-base-bg pt-3 pb-1 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10">
-        <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden">
+      {/* ── 始终可见的 sticky 进度条（四色光谱 + 末端柔光高光） ── */}
+      <div className="sticky top-16 sm:top-[4.5rem] lg:top-20 z-40 bg-base-bg/95 backdrop-blur-[2px] pt-3 pb-1 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10">
+        <div className="spectrum-track">
           <motion.div
-            className="h-full bg-brand-cyan rounded-full"
+            className="spectrum-fill"
             animate={{ width: `${progress}%` }}
-            transition={{ duration: 0.35, ease: 'easeOut' }}
-          />
+            transition={{ duration: 0.55, ease: [0.16, 0.84, 0.34, 1] }}
+          >
+            <span className="spectrum-fill-gradient" aria-hidden />
+          </motion.div>
+          {progress > 1.5 && (
+            <motion.span
+              key="cap"
+              className="spectrum-cap"
+              aria-hidden
+              animate={{ left: `${progress}%` }}
+              transition={{ duration: 0.55, ease: [0.16, 0.84, 0.34, 1] }}
+            />
+          )}
         </div>
-        <div className="flex items-center mt-1">
+        <div className="flex items-center mt-1.5">
           {/* 作答过快提示（左侧，淡入淡出） */}
           <AnimatePresence>
             {cooldownMsg && (
@@ -858,18 +869,16 @@ export default function Questionnaire({ onComplete }) {
             </div>
 
             {!modeChosen && (
-              <div className="max-w-xl mx-auto mt-5 grid gap-3 text-left sm:grid-cols-2">
-                <div className="rounded-card border border-brand-cyan/20 bg-brand-cyan/5 p-4">
-                  <p className="text-[11px] font-semibold tracking-wide text-brand-cyan mb-1">
-                    {QUESTION_MODE_COPY.single.badge}
-                  </p>
+              <div className="max-w-xl mx-auto mt-6 grid gap-x-6 gap-y-4 text-left sm:grid-cols-2">
+                <div className="relative pl-3 sm:pl-4">
+                  <span className="absolute left-0 top-1 h-[calc(100%-0.25rem)] w-[2px] rounded-full bg-brand-cyan/70" aria-hidden />
+                  <p className="text-eyebrow mb-1.5">{QUESTION_MODE_COPY.single.badge}</p>
                   <p className="text-sm font-semibold text-base-text mb-1">{QUESTION_MODE_COPY.single.title}</p>
                   <p className="text-xs leading-relaxed text-base-mute">{QUESTION_MODE_COPY.single.description}</p>
                 </div>
-                <div className="rounded-card border border-brand-purple/20 bg-brand-purple/5 p-4">
-                  <p className="text-[11px] font-semibold tracking-wide text-brand-purple mb-1">
-                    {QUESTION_MODE_COPY.dual.badge}
-                  </p>
+                <div className="relative pl-3 sm:pl-4">
+                  <span className="absolute left-0 top-1 h-[calc(100%-0.25rem)] w-[2px] rounded-full bg-brand-purple/70" aria-hidden />
+                  <p className="text-eyebrow mb-1.5" style={{ color: '#88619a' }}>{QUESTION_MODE_COPY.dual.badge}</p>
                   <p className="text-sm font-semibold text-base-text mb-1">{QUESTION_MODE_COPY.dual.title}</p>
                   <p className="text-xs leading-relaxed text-base-mute">{QUESTION_MODE_COPY.dual.description}</p>
                 </div>
@@ -880,11 +889,21 @@ export default function Questionnaire({ onComplete }) {
 
         {modeChosen && currentModeCopy && (
           <div className="max-w-xl mx-auto py-5 border-b border-gray-100">
-            <div className="rounded-card border border-gray-100 bg-white p-4 space-y-2">
+            <div
+              className={[
+                'relative pl-4 space-y-1.5',
+                selectedMode === 'dual' ? 'border-l-2 border-brand-purple/60' : 'border-l-2 border-brand-cyan/60',
+              ].join(' ')}
+            >
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-semibold tracking-wide text-brand-cyan">{currentModeCopy.badge}</p>
-                  <p className="text-sm font-semibold text-base-text">{currentModeCopy.title}</p>
+                  <p
+                    className="text-eyebrow"
+                    style={{ color: selectedMode === 'dual' ? '#88619a' : '#4298b4' }}
+                  >
+                    {currentModeCopy.badge}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-base-text">{currentModeCopy.title}</p>
                 </div>
                 {selectedMode === 'dual' && (
                   <span className="text-[11px] rounded-full bg-brand-purple/10 px-2.5 py-1 font-semibold text-brand-purple">
@@ -895,9 +914,10 @@ export default function Questionnaire({ onComplete }) {
               <p className="text-sm leading-relaxed text-base-mute">{currentModeCopy.description}</p>
               <p className="text-xs leading-relaxed text-base-mute">{currentModeCopy.hint}</p>
               {enteredFromInvite && (
-                <div className="rounded-xl border border-brand-purple/15 bg-brand-purple/5 px-3 py-2 text-xs leading-relaxed text-base-mute">
+                <p className="mt-2 text-xs leading-relaxed text-base-mute">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-brand-purple mr-1.5 align-middle" />
                   你是通过邀请链接进入的第二位作答者。请按你的真实感受完成答题，系统会在你提交后合成最终 Couple Type。
-                </div>
+                </p>
               )}
             </div>
           </div>
@@ -1036,8 +1056,12 @@ export default function Questionnaire({ onComplete }) {
             <motion.div
               key={q.id}
               ref={el => { itemRefs.current[idx] = el }}
-              animate={{ opacity: isActive ? 1 : 0.35 }}
-              transition={{ duration: 0.25 }}
+              animate={{
+                opacity: isActive ? 1 : 0.32,
+                y: isActive ? -2 : 0,
+                filter: isActive ? 'blur(0px)' : 'blur(0.3px)',
+              }}
+              transition={{ duration: 0.3, ease: [0.16, 0.84, 0.34, 1] }}
               className="border-b border-gray-100 last:border-0 py-8"
             >
               <p className={[

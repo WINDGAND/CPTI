@@ -9,35 +9,45 @@ export default function AiRelationshipPage({ resultData, onBackToResult }) {
 
   return (
     <div className={`flex min-h-[calc(100dvh-4rem)] flex-col md:min-h-0 md:pb-10 ${themeClass}`}>
-      <section className="relative shrink-0 overflow-hidden rounded-[28px] border border-white/80 bg-white p-5 shadow-card sm:p-7">
+      {/* Hero — 去外层大白卡，保留 radial gradient 光晕 */}
+      <section className="relative shrink-0 overflow-hidden px-1 py-5 sm:px-2 md:py-7">
         <div
-          className="absolute inset-0 opacity-80"
+          className="absolute inset-0 -z-10 opacity-90"
           style={{
             background:
-              'radial-gradient(circle at 14% 20%, rgba(118,184,224,0.2), transparent 28%), radial-gradient(circle at 82% 16%, rgba(244,167,176,0.18), transparent 30%), radial-gradient(circle at 55% 100%, rgba(142,214,180,0.16), transparent 34%)',
+              'radial-gradient(circle at 14% 20%, rgba(118,184,224,0.18), transparent 30%),' +
+              'radial-gradient(circle at 82% 16%, rgba(244,167,176,0.16), transparent 30%),' +
+              'radial-gradient(circle at 55% 100%, rgba(142,214,180,0.14), transparent 36%)',
           }}
           aria-hidden
         />
         <div className="relative flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div className="max-w-2xl">
-            <p className="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-brand-cyan shadow-sm">
-              <Sparkles size={13} aria-hidden />
+            <p className="text-eyebrow inline-flex items-center gap-1.5">
+              <Sparkles size={12} aria-hidden />
               已载入最近一次 CPTI 结果
             </p>
-            <h1 className="mt-4 text-2xl font-black leading-tight text-base-text md:text-3xl">
+            <h1 className="mt-3 text-2xl md:text-3xl font-extrabold leading-tight text-base-text">
               AI 关系助手
             </h1>
-            <p className="mt-3 text-sm leading-7 text-base-mute">
-              当前基于 <span className="font-bold text-base-text">{context.code}</span>
-              {context.title ? ` · ${context.title}` : ''} 进行对话。你可以直接问具体相处问题，聊天记录和测试结果都只保存在当前浏览器。
-            </p>
+            <div className="mt-2 flex items-center gap-2.5">
+              <span
+                className="h-[3px] w-10 rounded-full"
+                style={{ background: 'var(--poster-accent, #4298b4)', opacity: 0.85 }}
+                aria-hidden
+              />
+              <p className="text-xs md:text-sm text-base-mute font-display tracking-wide">
+                <span className="font-bold text-base-text">{context.code}</span>
+                {context.title ? ` · ${context.title}` : ''}
+              </p>
+            </div>
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row md:shrink-0">
             <button
               type="button"
               onClick={onBackToResult}
-              className="inline-flex items-center justify-center gap-2 rounded-full border border-gray-100 bg-white px-4 py-2.5 text-sm font-semibold text-base-text shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+              className="inline-flex items-center justify-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-base-text shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
             >
               <ArrowLeft size={16} aria-hidden />
               返回结果报告
