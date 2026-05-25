@@ -292,12 +292,21 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
     return created.id
   }
 
-  // 在发送/重新生成前，若已有进行中的请求，先 abort 让它走 'aborted' 分支并清理 UI
+  // 主动 abort 的唯一入口：点击「停止」、发送/重新生成时打断上一轮、切换会话等都走这里。
+  // 关键：旧请求 finally 里的 `abortRef.current === controller` 校验在这之后必然失败
+  // （我们已经把 abortRef.current 置 null），所以那条路径不会再重置发送状态。
+  // 必须在这里同步把 isSending/canStop/streamingMessageId 切回 idle，
+  // 否则界面会卡在「停止」按钮上、composer 也无法继续发送。
+  // 若调用方紧接着 requestAssistant() 起一轮新请求，新的 setIsSending(true) 会在
+  // 同一个事件处理器内被 React 批处理合并，不会出现闪烁。
   function abortInflight() {
     if (abortRef.current) {
       try { abortRef.current.abort() } catch { /* ignore */ }
       abortRef.current = null
     }
+    setIsSending(false)
+    setCanStop(false)
+    setStreamingMessageId(null)
   }
 
   const sendMessage = useCallback((content) => {
