@@ -52,11 +52,19 @@ function SessionRow({ session, isCurrent, onSelect, onRename, onDelete }) {
   function openMenu() {
     const rect = triggerRef.current?.getBoundingClientRect()
     if (!rect) return
-    // 用视口宽高夹一下，避免菜单在屏幕右侧/底部溢出
     const MENU_W = 128
     const MENU_H = 80
-    const left = Math.min(Math.max(rect.right - MENU_W, 8), window.innerWidth - MENU_W - 8)
-    const top = Math.min(rect.bottom + 4, window.innerHeight - MENU_H - 8)
+    const GAP = 8
+    // 默认弹到触发按钮的右侧；若右侧空间不足（如移动端右抽屉），翻转到左侧
+    let left = rect.right + GAP
+    if (left + MENU_W > window.innerWidth - GAP) {
+      left = Math.max(GAP, rect.left - MENU_W - GAP)
+    }
+    // 垂直方向与触发按钮顶部对齐；若超出底部则向上夹一下
+    let top = rect.top
+    if (top + MENU_H > window.innerHeight - GAP) {
+      top = Math.max(GAP, window.innerHeight - MENU_H - GAP)
+    }
     setMenuPos({ top, left })
     setMenuOpen(true)
   }

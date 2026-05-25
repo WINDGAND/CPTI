@@ -124,16 +124,32 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
     setCurrentSession(context, nextId)
   }, [context])
 
-  /* ── 切换会话时清理临时状态 ─────────────────────────────── */
+  /* ── 切换会话时清理临时状态 ─────────────────────────────── *
+   * 关键：仅在「从一个已有会话切换到另一个会话」时才 abort 在途请求。
+   * 否则会出现这样一个回归 bug —— 用户在「无当前会话」状态下点发送，
+   * sendMessage → ensureSession 会同步把 currentSessionId 从 null 改成新 id，
+   * 接着 React 触发本 effect，把刚刚发起的请求直接 abort 掉，
+   * 表现为「发送后界面卡在『停止』按钮，AI 永远不会回复」。
+   */
+  const prevSessionIdRef = useRef(null)
   useEffect(() => {
+    const prev = prevSessionIdRef.current
+    prevSessionIdRef.current = currentSessionId
+
     setInput('')
     setQuoteText('')
     setError('')
     setSelectionMode(false)
     setSelectedIds(new Set())
-    if (abortRef.current) {
+
+    if (prev && prev !== currentSessionId && abortRef.current) {
       abortRef.current.abort()
       abortRef.current = null
+      // 主动 abort 时，旧请求 finally 里的 `abortRef.current === controller` 判断会失败，
+      // 因此这里同步重置发送状态，避免新会话进来还卡在「停止」按钮。
+      setIsSending(false)
+      setCanStop(false)
+      setStreamingMessageId(null)
     }
   }, [currentSessionId])
 
@@ -195,19 +211,12 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
   }
 
   /* ── 发送 ──────────────────────────────────────────────── */
-  const requestAssistant = useCallback(async (baseMessages, { replaceAssistantId } = {}) => {
+  // 调用方约定：baseMessages 内不包含本轮需要生成的 assistant 占位，
+  // 这里统一在末尾追加一条 assistant 占位用于流式回填。
+  // 重新生成场景中，调用方会把旧的 assistant 消息先从 baseMessages 切除。
+  const requestAssistant = useCallback(async (baseMessages) => {
     const assistantMessage = buildNewMessage('assistant', '')
-    let workingMessages
-
-    if (replaceAssistantId) {
-      workingMessages = baseMessages.map((m) => (
-        m.id === replaceAssistantId
-          ? { ...m, id: assistantMessage.id, content: '', createdAt: assistantMessage.createdAt }
-          : m
-      ))
-    } else {
-      workingMessages = [...baseMessages, assistantMessage]
-    }
+    const workingMessages = [...baseMessages, assistantMessage]
 
     shouldAutoScrollRef.current = true
     setMessages(workingMessages)
@@ -221,7 +230,7 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
 
     try {
       const requestMessages = baseMessages
-        .filter((m) => m.content && m.id !== replaceAssistantId)
+        .filter((m) => m.content)
         .slice(-8)
         .map(({ role, content }) => ({ role, content }))
 
@@ -323,9 +332,9 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
       abortInflight()
     }
     const idx = messages.length - 1 - lastAssistantIdx
-    const targetMessage = messages[idx]
+    // 把旧的 assistant 消息从基线里切除，requestAssistant 会在末尾追加新的占位
     const base = messages.slice(0, idx)
-    requestAssistant(base, { replaceAssistantId: targetMessage.id })
+    requestAssistant(base)
   }
 
   function stopGeneration() {
