@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, Copy, Quote, RotateCcw, Trash2 } from 'lucide-react'
+import { Check, Copy, Pencil, Quote, RotateCcw, Trash2 } from 'lucide-react'
 import AiMessageContent from './AiMessageContent'
+
+const EDIT_MAX_LENGTH = 800
 
 function formatRelative(input) {
   try {
@@ -23,15 +25,20 @@ export default function ChatMessage({
   isSelected = false,
   selectionMode = false,
   isLastAssistant = false,
+  isLastUser = false,
   isSending = false,
   onCopy,
   onDelete,
   onRegenerate,
   onQuote,
+  onEditSave,
   onToggleSelect,
 }) {
   const isUser = message.role === 'user'
   const [justCopied, setJustCopied] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+  const editTextareaRef = useRef(null)
   const longPressTimer = useRef(null)
   const longPressTriggered = useRef(false)
 
@@ -41,13 +48,65 @@ export default function ChatMessage({
     return () => clearTimeout(t)
   }, [justCopied])
 
+  // 进入编辑模式时聚焦末尾并按内容自适应高度
+  useEffect(() => {
+    if (!editing) return
+    const ta = editTextareaRef.current
+    if (!ta) return
+    ta.focus()
+    try { ta.setSelectionRange(ta.value.length, ta.value.length) } catch { /* ignore */ }
+    ta.style.height = 'auto'
+    ta.style.height = `${Math.min(ta.scrollHeight, 240)}px`
+  }, [editing])
+
+  // 上游消息内容变化时（例如重新生成路径），同步退出编辑态，避免脏 draft 残留
+  useEffect(() => {
+    if (!editing) return
+    setEditing(false)
+    setDraft('')
+  }, [message.id])
+
   function handleCopyClick() {
     onCopy?.(message)
     setJustCopied(true)
   }
 
+  function startEdit() {
+    setDraft(message.content || '')
+    setEditing(true)
+  }
+  function cancelEdit() {
+    setEditing(false)
+    setDraft('')
+  }
+  function commitEdit() {
+    const trimmed = draft.trim()
+    if (!trimmed) return
+    const original = String(message.content || '').trim()
+    setEditing(false)
+    setDraft('')
+    if (trimmed === original) return // 没变就不重发
+    onEditSave?.(message, trimmed)
+  }
+  function handleEditKeyDown(event) {
+    if (event.nativeEvent?.isComposing) return
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault()
+      commitEdit()
+    } else if (event.key === 'Escape') {
+      event.preventDefault()
+      cancelEdit()
+    }
+  }
+  function handleEditChange(event) {
+    setDraft(event.target.value)
+    const ta = event.target
+    ta.style.height = 'auto'
+    ta.style.height = `${Math.min(ta.scrollHeight, 240)}px`
+  }
+
   function startLongPress() {
-    if (selectionMode) return
+    if (selectionMode || editing) return
     longPressTriggered.current = false
     longPressTimer.current = setTimeout(() => {
       longPressTriggered.current = true
@@ -64,6 +123,7 @@ export default function ChatMessage({
     }
   }
   function handleClickRow() {
+    if (editing) return
     if (selectionMode) {
       onToggleSelect?.(message)
       return
@@ -132,7 +192,42 @@ export default function ChatMessage({
 
           {/* 内容 */}
           <div className={isUser ? '' : 'pl-1.5'}>
-            {isUser ? (
+            {editing && isUser ? (
+              <div className="min-w-[240px]" onClick={(e) => e.stopPropagation()}>
+                <textarea
+                  ref={editTextareaRef}
+                  value={draft}
+                  onChange={handleEditChange}
+                  onKeyDown={handleEditKeyDown}
+                  maxLength={EDIT_MAX_LENGTH}
+                  rows={1}
+                  className="w-full resize-none rounded-md border border-white/40 bg-white/15 px-2 py-1.5 text-[14px] leading-7 text-white outline-none placeholder:text-white/60 focus:border-white/70"
+                  placeholder="修改消息内容…"
+                />
+                <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px]">
+                  <span className="text-white/65">
+                    保存后会丢弃下方未完成的回复并重新生成 · Enter 保存 · Esc 取消
+                  </span>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); cancelEdit() }}
+                      className="rounded-md px-2 py-0.5 text-[11.5px] font-semibold text-white/85 hover:bg-white/15"
+                    >
+                      取消
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); commitEdit() }}
+                      disabled={!draft.trim()}
+                      className="rounded-md bg-white px-2 py-0.5 text-[11.5px] font-semibold text-brand-cyan transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      保存并重发
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : isUser ? (
               <AiMessageContent content={message.content} isUser />
             ) : (
               <>
@@ -165,8 +260,8 @@ export default function ChatMessage({
           )}
         </div>
 
-        {/* 操作工具栏 — 仅非流式 & 非选择模式下，hover/touch 后显示 */}
-        {!isStreaming && !selectionMode && (
+        {/* 操作工具栏 — 仅非流式 & 非选择模式 & 非编辑态时显示 */}
+        {!isStreaming && !selectionMode && !editing && (
           <div
             className={[
               'mt-1.5 flex items-center gap-0.5 text-base-mute',
@@ -210,6 +305,19 @@ export default function ChatMessage({
               >
                 <RotateCcw size={12} />
                 <span className="leading-none">重新生成</span>
+              </button>
+            )}
+
+            {isUser && isLastUser && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); startEdit() }}
+                className="inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-[11px] hover:bg-black/[0.045] hover:text-base-text"
+                aria-label="修改并重新发送"
+                title="修改这条消息并重新生成回复"
+              >
+                <Pencil size={12} />
+                <span className="leading-none">修改</span>
               </button>
             )}
 

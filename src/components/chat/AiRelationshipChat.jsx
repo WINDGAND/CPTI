@@ -346,6 +346,32 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
     requestAssistant(base)
   }
 
+  // 修改最近一条 user 消息：截断到这条消息（含编辑后内容），
+  // 顺带把它之后的（含被「停止」截断的 assistant 占位）一起丢弃，重新触发 AI 回复。
+  function handleEditSave(message, nextContent) {
+    const idx = messages.findIndex((m) => m.id === message.id)
+    if (idx === -1) {
+      console.warn('[AiRelationshipChat] edit: message not found', message?.id)
+      return
+    }
+    const cleaned = String(nextContent || '').trim()
+    if (!cleaned) return
+
+    if (isSending) {
+      console.warn('[AiRelationshipChat] edit while sending, aborting previous request')
+      abortInflight()
+    }
+
+    const editedMessage = {
+      ...message,
+      content: cleaned,
+      // 把时间戳更新成「刚刚」，提示用户这是一次新的提交
+      createdAt: new Date().toISOString(),
+    }
+    const baseMessages = [...messages.slice(0, idx), editedMessage]
+    requestAssistant(baseMessages)
+  }
+
   function stopGeneration() {
     abortInflight()
   }
@@ -447,6 +473,12 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
   const lastAssistantId = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
       if (messages[i].role === 'assistant') return messages[i].id
+    }
+    return null
+  }, [messages])
+  const lastUserId = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (messages[i].role === 'user') return messages[i].id
     }
     return null
   }, [messages])
@@ -647,11 +679,13 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
                     isSelected={selectedIds.has(message.id)}
                     selectionMode={selectionMode}
                     isLastAssistant={message.id === lastAssistantId}
+                    isLastUser={message.id === lastUserId}
                     isSending={isSending}
                     onCopy={handleCopy}
                     onDelete={handleDelete}
                     onQuote={handleQuote}
                     onRegenerate={handleRegenerate}
+                    onEditSave={handleEditSave}
                     onToggleSelect={toggleSelect}
                   />
                 ))}
