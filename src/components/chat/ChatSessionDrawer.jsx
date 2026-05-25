@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Check, MessageCirclePlus, MoreHorizontal, Pencil, Trash2, X } from 'lucide-react'
 
@@ -37,19 +38,26 @@ function SessionRow({ session, isCurrent, onSelect, onRename, onDelete }) {
       }
     }
     function onScroll() { setMenuOpen(false) }
+    function onResize() { setMenuOpen(false) }
     window.addEventListener('mousedown', handler)
     window.addEventListener('scroll', onScroll, true)
+    window.addEventListener('resize', onResize)
     return () => {
       window.removeEventListener('mousedown', handler)
       window.removeEventListener('scroll', onScroll, true)
+      window.removeEventListener('resize', onResize)
     }
   }, [menuOpen])
 
   function openMenu() {
     const rect = triggerRef.current?.getBoundingClientRect()
-    if (rect) {
-      setMenuPos({ top: rect.bottom + 4, left: rect.right - 128 })
-    }
+    if (!rect) return
+    // 用视口宽高夹一下，避免菜单在屏幕右侧/底部溢出
+    const MENU_W = 128
+    const MENU_H = 80
+    const left = Math.min(Math.max(rect.right - MENU_W, 8), window.innerWidth - MENU_W - 8)
+    const top = Math.min(rect.bottom + 4, window.innerHeight - MENU_H - 8)
+    setMenuPos({ top, left })
     setMenuOpen(true)
   }
 
@@ -147,29 +155,33 @@ function SessionRow({ session, isCurrent, onSelect, onRename, onDelete }) {
         >
           <MoreHorizontal size={14} />
         </button>
-        {menuOpen && menuPos && (
-          <div
-            ref={menuRef}
-            className="fixed z-[100] w-32 overflow-hidden rounded-xl border border-gray-100 bg-white py-1 shadow-xl"
-            style={{ top: menuPos.top, left: menuPos.left }}
-          >
-            <button
-              type="button"
-              onClick={startRename}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12.5px] text-base-text hover:bg-black/[0.045]"
+        {/* Portal 到 body：避免被祖先的 backdrop-filter / transform / overflow 影响 fixed 定位 */}
+        {menuOpen && menuPos && typeof document !== 'undefined' && createPortal(
+          (
+            <div
+              ref={menuRef}
+              className="fixed z-[200] w-32 overflow-hidden rounded-xl border border-gray-100 bg-white py-1 shadow-xl"
+              style={{ top: menuPos.top, left: menuPos.left }}
             >
-              <Pencil size={12} />
-              重命名
-            </button>
-            <button
-              type="button"
-              onClick={() => { setMenuOpen(false); onDelete?.(session.id) }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12.5px] text-rose-600 hover:bg-rose-50"
-            >
-              <Trash2 size={12} />
-              删除
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={startRename}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12.5px] text-base-text hover:bg-black/[0.045]"
+              >
+                <Pencil size={12} />
+                重命名
+              </button>
+              <button
+                type="button"
+                onClick={() => { setMenuOpen(false); onDelete?.(session.id) }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12.5px] text-rose-600 hover:bg-rose-50"
+              >
+                <Trash2 size={12} />
+                删除
+              </button>
+            </div>
+          ),
+          document.body,
         )}
       </div>
     </div>

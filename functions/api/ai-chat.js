@@ -44,6 +44,18 @@ export async function onRequest(context) {
 
   const stream = new ReadableStream({
     async start(controller) {
+      // 首字节心跳：让客户端立刻知道连接已建立，避免误判 first-byte timeout
+      controller.enqueue(encoder.encode(encodeSseEvent({ type: 'open', t: Date.now() })))
+
+      // 上游慢时每 10s 补一次 SSE comment 心跳
+      const heartbeat = setInterval(() => {
+        try {
+          controller.enqueue(encoder.encode(`: ping ${Date.now()}\n\n`))
+        } catch {
+          /* stream closed */
+        }
+      }, 10_000)
+
       try {
         await streamAiChatCompletionEvents({
           apiKey: context.env.DEEPSEEK_API_KEY,
@@ -64,6 +76,7 @@ export async function onRequest(context) {
           status,
         })))
       } finally {
+        clearInterval(heartbeat)
         controller.close()
       }
     },
@@ -75,6 +88,7 @@ export async function onRequest(context) {
       'Content-Type': 'text/event-stream; charset=utf-8',
       'Cache-Control': 'no-cache, no-transform',
       Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
     },
   })
 }

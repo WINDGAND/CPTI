@@ -265,10 +265,13 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
         setError(formatError(err))
       }
     } finally {
-      setIsSending(false)
-      setCanStop(false)
-      setStreamingMessageId(null)
-      abortRef.current = null
+      // 仅当本轮的 controller 仍是 abortRef.current 时才清空，避免覆盖掉新一轮请求的 controller
+      if (abortRef.current === controller) {
+        setIsSending(false)
+        setCanStop(false)
+        setStreamingMessageId(null)
+        abortRef.current = null
+      }
     }
   }, [context])
 
@@ -280,9 +283,21 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
     return created.id
   }
 
+  // 在发送/重新生成前，若已有进行中的请求，先 abort 让它走 'aborted' 分支并清理 UI
+  function abortInflight() {
+    if (abortRef.current) {
+      try { abortRef.current.abort() } catch { /* ignore */ }
+      abortRef.current = null
+    }
+  }
+
   const sendMessage = useCallback((content) => {
     const text = String(content ?? '').trim()
-    if (!text || isSending) return
+    if (!text) return
+    if (isSending) {
+      console.warn('[AiRelationshipChat] send while sending, aborting previous request')
+      abortInflight()
+    }
 
     ensureSession()
     let composedText = text
@@ -298,9 +313,15 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
   }, [messages, isSending, quoteText, requestAssistant])
 
   function regenerateLastAssistant() {
-    if (isSending) return
     const lastAssistantIdx = [...messages].reverse().findIndex((m) => m.role === 'assistant')
-    if (lastAssistantIdx === -1) return
+    if (lastAssistantIdx === -1) {
+      console.warn('[AiRelationshipChat] regenerate: no assistant message found')
+      return
+    }
+    if (isSending) {
+      console.warn('[AiRelationshipChat] regenerate while sending, aborting previous request')
+      abortInflight()
+    }
     const idx = messages.length - 1 - lastAssistantIdx
     const targetMessage = messages[idx]
     const base = messages.slice(0, idx)
@@ -308,9 +329,7 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
   }
 
   function stopGeneration() {
-    if (abortRef.current) {
-      abortRef.current.abort()
-    }
+    abortInflight()
   }
 
   /* ── 消息级操作 ─────────────────────────────────────────── */

@@ -106,6 +106,12 @@ async function consumeSseResponse(response, onDelta, signal) {
           throw buildApiError(payload, payload.error, payload.status || 500)
         }
 
+        // 服务端心跳（type: 'open'）：仅用于尽早占住首字节，让 idle timer 进入"流中"档位。
+        // 不携带 delta，不写入 finalMessage。
+        if (payload?.type === 'open') {
+          continue
+        }
+
         if (payload?.delta) {
           finalMessage = payload.message || `${finalMessage}${payload.delta}`
           onDelta?.(payload.delta, finalMessage)

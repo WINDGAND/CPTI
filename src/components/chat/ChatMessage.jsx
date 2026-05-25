@@ -201,8 +201,11 @@ export default function ChatMessage({
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onRegenerate?.(message) }}
-                disabled={isSending}
-                className="inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-[11px] hover:bg-black/[0.045] hover:text-base-text disabled:cursor-not-allowed disabled:opacity-50"
+                aria-disabled={isSending ? 'true' : undefined}
+                className={[
+                  'inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-[11px] hover:bg-black/[0.045] hover:text-base-text',
+                  isSending ? 'opacity-60' : '',
+                ].join(' ')}
                 aria-label="重新生成回复"
               >
                 <RotateCcw size={12} />
