@@ -16,15 +16,16 @@ import { sendAiChatMessage } from '../../utils/aiChatApi'
 import {
   buildAiRelationshipContext,
 } from '../../utils/aiChatContext'
+import { useLanguage } from '../../i18n/LanguageContext'
 import {
   MAX_MESSAGES_PER_SESSION,
   clearAllSessions,
   createSession,
   deleteSession,
-  deriveTitle,
   genId,
   listSessions,
   renameSession,
+  resolveSessionTitle,
   saveSession,
   setCurrentSession,
 } from '../../utils/aiChatSessions'
@@ -35,25 +36,17 @@ import ChatMessage from './ChatMessage'
 import ChatSessionDrawer from './ChatSessionDrawer'
 import ChatShareModal from './ChatShareModal'
 
-function formatError(error) {
+function formatError(error, t) {
   if (error?.code === 'aborted') return ''
-  if (error?.code === 'message-too-long' || error?.status === 400) {
-    return '这次输入有点长，可以拆成一个更具体的问题再问我。'
-  }
-  if (error?.code === 'deepseek-key-missing') {
-    return 'AI 服务还没有配置好 DeepSeek Key，部署环境需要补充环境变量。'
-  }
-  if (error?.code === 'network-error') {
-    return '网络好像有点不稳，请检查连接后再试一次。'
-  }
-  if (error?.code === 'idle-timeout' || error?.code === 'hard-timeout') {
-    return 'AI 这次连接好像中断了，请重新发送试试。'
-  }
-  if (error?.code === 'empty-response') {
-    return 'AI 这次没有给出回复，请重新发送试试。'
-  }
-  if (error?.status === 504) return 'AI 这次思考超时了，稍后再试一次。'
-  return error?.message || 'AI 关系助手暂时没有回应，请稍后重试。'
+  if (error?.code === 'message-too-long' || error?.status === 400) return t('chat.err_too_long')
+  if (error?.code === 'deepseek-key-missing') return t('chat.err_key_missing')
+  if (error?.code === 'network-error') return t('chat.err_network')
+  if (error?.code === 'idle-timeout' || error?.code === 'hard-timeout') return t('chat.err_idle')
+  if (error?.code === 'empty-response') return t('chat.err_empty')
+  if (error?.status === 504) return t('chat.err_timeout')
+  // 不直接使用 error.message —— 它由 aiChatApi.js 写死为中文，会绕过 i18n。
+  // 统一回退到字典里的默认错误提示，保证中英环境一致。
+  return t('chat.err_default')
 }
 
 function buildNewMessage(role, content) {
@@ -66,6 +59,7 @@ function buildNewMessage(role, content) {
 }
 
 export default function AiRelationshipChat({ resultData, themeClass = 'theme-blue', toolbarLeft = null }) {
+  const { t } = useLanguage()
   const context = useMemo(() => buildAiRelationshipContext(resultData), [resultData])
 
   // 会话列表 + 当前会话
@@ -160,9 +154,7 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
     if (persistTimer.current) clearTimeout(persistTimer.current)
     persistTimer.current = setTimeout(() => {
       const current = sessions.find((s) => s.id === currentSessionId)
-      const title = current?.title && current.title !== '新的对话'
-        ? current.title
-        : deriveTitle(messages)
+      const title = resolveSessionTitle(current?.title, messages, t('chat.new_chat'))
       const next = saveSession(context, {
         id: currentSessionId,
         title,
@@ -179,7 +171,7 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
       })
     }, 250)
     return () => persistTimer.current && clearTimeout(persistTimer.current)
-  }, [messages, currentSessionId, context, sessions])
+  }, [messages, currentSessionId, context, sessions, t])
 
   /* ── 滚动 ───────────────────────────────────────────────── */
   useEffect(() => {
@@ -256,7 +248,7 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
           const filtered = cur.filter((m) => !(m.id === assistantMessage.id && !m.content?.trim()))
           return filtered.map((m) => (
             m.id === assistantMessage.id && err.partial
-              ? { ...m, content: `${err.partial}\n\n_（已停止）_` }
+              ? { ...m, content: `${err.partial}\n\n_${t('chat.stop_marker')}_` }
               : m
           ))
         })
@@ -264,14 +256,14 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
         // 客户端超时但已经收到部分内容：保留半截回复 + 提示
         setMessages((cur) => cur.map((entry) => (
           entry.id === assistantMessage.id
-            ? { ...entry, content: `${err.partial}\n\n_（连接中断，回复未完成）_` }
+            ? { ...entry, content: `${err.partial}\n\n_${t('chat.partial_marker')}_` }
             : entry
         )))
-        setError(formatError(err))
+        setError(formatError(err, t))
       } else {
         console.warn('[AiRelationshipChat] request failed', err)
         setMessages((cur) => cur.filter((entry) => entry.id !== assistantMessage.id))
-        setError(formatError(err))
+        setError(formatError(err, t))
       }
     } finally {
       // 仅当本轮的 controller 仍是 abortRef.current 时才清空，避免覆盖掉新一轮请求的 controller
@@ -286,7 +278,7 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
 
   function ensureSession() {
     if (currentSessionId) return currentSessionId
-    const created = createSession(context, { title: '新的对话' })
+    const created = createSession(context, { title: t('chat.new_chat') })
     setSessions((prev) => [created, ...prev])
     setCurrentSessionId(created.id)
     return created.id
@@ -417,7 +409,7 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
   function batchCopy() {
     const picked = messages.filter((m) => selectedIds.has(m.id))
     if (picked.length === 0) return
-    const md = toMarkdown(picked, { context, title: '对话精选' })
+    const md = toMarkdown(picked, { context, title: t('chat.selected_collection_title') })
     copyTextToClipboard(md)
     exitSelection()
   }
@@ -427,7 +419,7 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
 
   /* ── 会话操作 ───────────────────────────────────────────── */
   function handleNewSession() {
-    const created = createSession(context, { title: '新的对话' })
+    const created = createSession(context, { title: t('chat.new_chat') })
     setSessions((prev) => [created, ...prev.filter((s) => s.id !== created.id)])
     setCurrentSessionId(created.id)
     setMessages([])
@@ -466,7 +458,7 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
     [sessions],
   )
   const currentSession = sortedSessions.find((s) => s.id === currentSessionId)
-  const sessionTitle = currentSession?.title || (messages.length ? deriveTitle(messages) : '新的对话')
+  const sessionTitle = resolveSessionTitle(currentSession?.title, messages, t('chat.new_chat'))
   const shareMessages = selectionMode && selectedIds.size > 0
     ? messages.filter((m) => selectedIds.has(m.id))
     : messages
@@ -484,7 +476,38 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
   }, [messages])
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col md:flex-row">
+    <div className="relative flex h-full min-h-0 w-full flex-col md:flex-row">
+      {/* ── 桌面端左上角"控制岛" ──────────────────────────────────
+       * 设计目标（参考 Claude.ai / Notion / Accio Work 等）：
+       *   切换按钮在 viewport 中的 (x, y) 坐标永远不变，只切换图标。
+       *   收起态下右侧紧贴一个"新建对话"按钮形成视觉锚点对，
+       *   展开态下隐藏新建按钮（sidebar 内顶部本就有完整"新建对话"主按钮）。
+       *
+       * 用 absolute 锚到主容器左上角，不再放在工具栏 flex 行中 —
+       * 这样不论 sidebar 0px↔260px 切换，按钮位置都不会水平移动。 */}
+      <div className="pointer-events-none hidden md:flex absolute left-3 top-2.5 z-40 items-center gap-1">
+        <button
+          type="button"
+          onClick={() => setSidebarCollapsed((v) => !v)}
+          className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-md text-base-mute transition-colors hover:bg-black/[0.045] hover:text-base-text"
+          aria-label={sidebarCollapsed ? t('chat.expand_sidebar') : t('chat.collapse_sidebar')}
+          title={sidebarCollapsed ? t('chat.expand_sidebar') : t('chat.collapse_sidebar')}
+        >
+          {sidebarCollapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
+        </button>
+        {sidebarCollapsed && (
+          <button
+            type="button"
+            onClick={handleNewSession}
+            className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-md text-base-mute transition-colors hover:bg-black/[0.045] hover:text-base-text"
+            aria-label={t('chat.new_chat_aria')}
+            title={t('chat.new_chat')}
+          >
+            <MessageCirclePlus size={15} />
+          </button>
+        )}
+      </div>
+
       {/* 桌面端会话侧栏（可折叠） */}
       <ChatSessionDrawer
         variant="desktop"
@@ -503,7 +526,7 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
             className="flex w-full items-center justify-center gap-2 rounded-lg py-2 text-[12px] font-semibold text-base-mute transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Trash2 size={12} />
-            清空所有对话
+            {t('chat.clear_all')}
           </button>
         )}
       />
@@ -527,7 +550,7 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
             className="flex w-full items-center justify-center gap-2 rounded-lg py-2 text-[12px] font-semibold text-base-mute transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Trash2 size={12} />
-            清空所有对话
+            {t('chat.clear_all')}
           </button>
         )}
       />
@@ -547,25 +570,24 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
         {/* 工具栏 — 透明背景，仅靠底部 hairline 与消息区分隔 */}
         <div className="relative z-20 flex shrink-0 items-center justify-between gap-2 px-3 py-2.5 sm:px-4">
           <div className="min-w-0 flex items-center gap-1.5">
-            {/* 桌面端 sidebar 收起/展开切换 */}
-            <button
-              type="button"
-              onClick={() => setSidebarCollapsed((v) => !v)}
-              className="hidden md:inline-flex h-8 w-8 items-center justify-center rounded-md text-base-mute transition-colors hover:bg-black/[0.045] hover:text-base-text"
-              aria-label={sidebarCollapsed ? '展开对话历史' : '收起对话历史'}
-              title={sidebarCollapsed ? '展开对话历史' : '收起对话历史'}
-            >
-              {sidebarCollapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
-            </button>
+            {/* sidebar 切换按钮已抽到外层"左上角控制岛"，工具栏不再放它。
+                收起态下控制岛会占据工具栏左上方约 80px 空间，这里加一个 spacer
+                让 toolbarLeft / 标题向右让位避开重叠；展开态时 sidebar 自身占据
+                那块区域，spacer 宽度归零，让 toolbarLeft 紧贴 sidebar 边缘。 */}
+            <div
+              className="hidden md:block shrink-0 transition-[width] duration-300 ease-out"
+              style={{ width: sidebarCollapsed ? 78 : 0 }}
+              aria-hidden
+            />
             {toolbarLeft}
             <div className="min-w-0 flex items-center gap-2">
               <p className="truncate text-[13.5px] font-bold leading-tight text-base-text">
-                {selectionMode ? `已选 ${selectedIds.size} 条` : sessionTitle}
+                {selectionMode ? t('chat.selection_count', { n: selectedIds.size }) : sessionTitle}
               </p>
               {!selectionMode && context.code && (
                 <span
                   className="hidden sm:inline-flex h-5 shrink-0 items-center rounded-full bg-brand-cyan/10 px-2 text-[10px] font-semibold tracking-wide text-brand-cyan"
-                  title={`基于 ${context.code} 结果${context.mode === 'dual' ? '（双人）' : '（单人）'}`}
+                  title={context.mode === 'dual' ? t('chat.based_on_dual', { code: context.code }) : t('chat.based_on_single', { code: context.code })}
                 >
                   {context.code}
                 </span>
@@ -582,7 +604,7 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
                   disabled={selectedIds.size === 0}
                   className="hidden sm:inline-flex h-8 items-center gap-1 rounded-md px-2 text-[12px] font-medium text-base-text transition-colors hover:bg-black/[0.045] disabled:opacity-40"
                 >
-                  复制选中
+                  {t('chat.copy_selected')}
                 </button>
                 <button
                   type="button"
@@ -591,7 +613,7 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
                   className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-[12px] font-medium text-base-text transition-colors hover:bg-black/[0.045] disabled:opacity-40"
                 >
                   <Share2 size={13} />
-                  <span className="hidden sm:inline">分享选中</span>
+                  <span className="hidden sm:inline">{t('chat.share_selected')}</span>
                 </button>
                 <button
                   type="button"
@@ -600,14 +622,14 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
                   className="inline-flex h-8 items-center gap-1 rounded-md bg-rose-50 px-2 text-[12px] font-medium text-rose-600 transition-colors hover:bg-rose-100 disabled:opacity-40"
                 >
                   <Trash2 size={13} />
-                  <span className="hidden sm:inline">删除</span>
+                  <span className="hidden sm:inline">{t('chat.delete_short')}</span>
                 </button>
                 <span className="mx-1 h-5 w-px bg-gray-200" aria-hidden />
                 <button
                   type="button"
                   onClick={exitSelection}
                   className="flex h-8 w-8 items-center justify-center rounded-md text-base-mute hover:bg-black/[0.045] hover:text-base-text"
-                  aria-label="退出选择"
+                  aria-label={t('chat.exit_selection')}
                 >
                   <X size={14} />
                 </button>
@@ -618,16 +640,16 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
                   type="button"
                   onClick={handleNewSession}
                   className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-[12px] font-medium text-base-text transition-colors hover:bg-black/[0.045]"
-                  aria-label="新建对话"
+                  aria-label={t('chat.new_chat_aria')}
                 >
                   <MessageCirclePlus size={14} />
-                  <span className="hidden sm:inline">新建</span>
+                  <span className="hidden sm:inline">{t('chat.new_short')}</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setDrawerOpen(true)}
                   className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-[12px] font-medium text-base-text transition-colors hover:bg-black/[0.045] md:hidden"
-                  aria-label="对话历史"
+                  aria-label={t('chat.chat_history_aria')}
                 >
                   <History size={14} />
                 </button>
@@ -636,20 +658,20 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
                   onClick={() => setSelectionMode(true)}
                   disabled={messages.length === 0}
                   className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-[12px] font-medium text-base-text transition-colors hover:bg-black/[0.045] disabled:opacity-40"
-                  aria-label="选择消息"
+                  aria-label={t('chat.select_msg')}
                 >
                   <CheckSquare size={14} />
-                  <span className="hidden sm:inline">选择</span>
+                  <span className="hidden sm:inline">{t('chat.select_short')}</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setShareOpen(true)}
                   disabled={messages.length === 0}
                   className="inline-flex h-8 items-center gap-1 rounded-md bg-brand-cyan/10 px-2 text-[12px] font-semibold text-brand-cyan transition-colors hover:bg-brand-cyan/15 disabled:opacity-40"
-                  aria-label="分享对话"
+                  aria-label={t('chat.share')}
                 >
                   <Share2 size={13} />
-                  <span className="hidden sm:inline">分享</span>
+                  <span className="hidden sm:inline">{t('chat.share_short')}</span>
                 </button>
               </>
             )}
@@ -710,7 +732,7 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
                   className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-[11.5px] font-semibold text-base-text shadow-md hover:bg-white"
                 >
                   <ArrowDown size={12} />
-                  跳到最新
+                  {t('chat.jump_to_bottom')}
                 </button>
               </motion.div>
             )}
@@ -763,9 +785,9 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
               transition={{ duration: 0.2 }}
               className="relative z-10 w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl"
             >
-              <h4 className="text-[15px] font-bold text-base-text">清空所有对话？</h4>
+              <h4 className="text-[15px] font-bold text-base-text">{t('chat.clear_all_title')}</h4>
               <p className="mt-2 text-[13px] leading-6 text-base-mute">
-                将删除当前结果下所有 {sessions.length} 条对话历史。此操作仅作用于当前浏览器，无法撤销。
+                {t('chat.clear_all_desc', { count: sessions.length })}
               </p>
               <div className="mt-5 flex items-center justify-end gap-2">
                 <button
@@ -773,14 +795,14 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
                   onClick={() => setConfirmClearOpen(false)}
                   className="rounded-lg px-3 py-2 text-[13px] font-semibold text-base-text hover:bg-black/[0.05]"
                 >
-                  取消
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="button"
                   onClick={handleClearAll}
                   className="rounded-lg bg-rose-500 px-3 py-2 text-[13px] font-semibold text-white hover:bg-rose-600"
                 >
-                  全部清空
+                  {t('chat.clear_all_confirm')}
                 </button>
               </div>
             </motion.div>

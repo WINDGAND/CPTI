@@ -1,17 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
 import { Check, Copy, Pencil, Quote, RotateCcw, Trash2 } from 'lucide-react'
 import AiMessageContent from './AiMessageContent'
+import { useLanguage } from '../../i18n/LanguageContext'
 
 const EDIT_MAX_LENGTH = 800
 
-function formatRelative(input) {
+function formatRelative(input, t) {
   try {
     const d = input ? new Date(input) : new Date()
     if (Number.isNaN(d.getTime())) return ''
     const diff = Date.now() - d.getTime()
-    if (diff < 60_000) return '刚刚'
-    if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} 分钟前`
-    if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} 小时前`
+    if (diff < 60_000) return t('chat.just_now')
+    if (diff < 3_600_000) return t('chat.minutes_ago', { n: Math.floor(diff / 60_000) })
+    if (diff < 86_400_000) return t('chat.hours_ago', { n: Math.floor(diff / 3_600_000) })
     const pad = (n) => String(n).padStart(2, '0')
     return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
   } catch {
@@ -34,6 +35,7 @@ export default function ChatMessage({
   onEditSave,
   onToggleSelect,
 }) {
+  const { t } = useLanguage()
   const isUser = message.role === 'user'
   const [justCopied, setJustCopied] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -202,11 +204,11 @@ export default function ChatMessage({
                   maxLength={EDIT_MAX_LENGTH}
                   rows={1}
                   className="w-full resize-none rounded-md border border-white/40 bg-white/15 px-2 py-1.5 text-[14px] leading-7 text-white outline-none placeholder:text-white/60 focus:border-white/70"
-                  placeholder="修改消息内容…"
+                  placeholder={t('chat.edit_placeholder')}
                 />
                 <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px]">
                   <span className="text-white/65">
-                    保存后会丢弃下方未完成的回复并重新生成 · Enter 保存 · Esc 取消
+                    {t('chat.edit_hint')}
                   </span>
                   <div className="flex shrink-0 items-center gap-1.5">
                     <button
@@ -214,7 +216,7 @@ export default function ChatMessage({
                       onClick={(e) => { e.stopPropagation(); cancelEdit() }}
                       className="rounded-md px-2 py-0.5 text-[11.5px] font-semibold text-white/85 hover:bg-white/15"
                     >
-                      取消
+                      {t('common.cancel')}
                     </button>
                     <button
                       type="button"
@@ -222,7 +224,7 @@ export default function ChatMessage({
                       disabled={!draft.trim()}
                       className="rounded-md bg-white px-2 py-0.5 text-[11.5px] font-semibold text-brand-cyan transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      保存并重发
+                      {t('chat.save_resend')}
                     </button>
                   </div>
                 </div>
@@ -236,7 +238,7 @@ export default function ChatMessage({
                   : isStreaming
                     ? <span className="inline-flex items-center gap-1 text-base-mute">
                         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand-cyan" />
-                        <span className="text-xs">正在思考…</span>
+                        <span className="text-xs">{t('chat.typing')}</span>
                       </span>
                     : null}
                 {isStreaming && message.content && (
@@ -255,7 +257,7 @@ export default function ChatMessage({
                 'opacity-0 group-hover/msg:opacity-100',
               ].join(' ')}
             >
-              {formatRelative(message.createdAt)}
+              {formatRelative(message.createdAt, t)}
             </span>
           )}
         </div>
@@ -274,10 +276,10 @@ export default function ChatMessage({
               type="button"
               onClick={(e) => { e.stopPropagation(); handleCopyClick() }}
               className="inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-[11px] hover:bg-black/[0.045] hover:text-base-text"
-              aria-label="复制内容"
+              aria-label={t('chat.copy')}
             >
               {justCopied ? <Check size={12} className="text-brand-cyan" /> : <Copy size={12} />}
-              <span className="leading-none">{justCopied ? '已复制' : '复制'}</span>
+              <span className="leading-none">{justCopied ? t('chat.copied') : t('chat.copy')}</span>
             </button>
 
             {!isUser && (
@@ -285,10 +287,10 @@ export default function ChatMessage({
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onQuote?.(message) }}
                 className="inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-[11px] hover:bg-black/[0.045] hover:text-base-text"
-                aria-label="引用回复"
+                aria-label={t('chat.quote_aria')}
               >
                 <Quote size={12} />
-                <span className="leading-none">引用</span>
+                <span className="leading-none">{t('chat.quote')}</span>
               </button>
             )}
 
@@ -301,10 +303,10 @@ export default function ChatMessage({
                   'inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-[11px] hover:bg-black/[0.045] hover:text-base-text',
                   isSending ? 'opacity-60' : '',
                 ].join(' ')}
-                aria-label="重新生成回复"
+                aria-label={t('chat.regen_aria')}
               >
                 <RotateCcw size={12} />
-                <span className="leading-none">重新生成</span>
+                <span className="leading-none">{t('chat.regen')}</span>
               </button>
             )}
 
@@ -313,11 +315,11 @@ export default function ChatMessage({
                 type="button"
                 onClick={(e) => { e.stopPropagation(); startEdit() }}
                 className="inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-[11px] hover:bg-black/[0.045] hover:text-base-text"
-                aria-label="修改并重新发送"
-                title="修改这条消息并重新生成回复"
+                aria-label={t('chat.edit')}
+                title={t('chat.edit_title')}
               >
                 <Pencil size={12} />
-                <span className="leading-none">修改</span>
+                <span className="leading-none">{t('chat.edit')}</span>
               </button>
             )}
 
@@ -325,10 +327,10 @@ export default function ChatMessage({
               type="button"
               onClick={(e) => { e.stopPropagation(); onDelete?.(message) }}
               className="inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-[11px] hover:bg-rose-50 hover:text-rose-600"
-              aria-label="删除这条"
+              aria-label={t('chat.delete_aria')}
             >
               <Trash2 size={12} />
-              <span className="leading-none">删除</span>
+              <span className="leading-none">{t('chat.delete')}</span>
             </button>
           </div>
         )}

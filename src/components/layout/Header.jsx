@@ -1,23 +1,24 @@
 import { useMemo, useState } from 'react'
 import { BarChart3, CircleHelp, HeartHandshake, Home, MessageCircleHeart, MessageSquarePlus } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { RESULTS } from '../../data/results'
-import { TYPE_GROUP_META } from '../../data/typeGroups'
 import { useFeedback } from '../feedback/FeedbackContext'
+import { useLanguage } from '../../i18n/LanguageContext'
+import { useLocalizedResults, useLocalizedTypeGroupMeta } from '../../i18n/useLocalizedData'
+import LanguageSwitcher from './LanguageSwitcher'
 
-const NAV_ITEMS = [
-  { id: 'home', label: '首页', icon: Home },
-  { id: 'types', label: '情侣类型', icon: HeartHandshake },
+const NAV_ITEM_DEFS = [
+  { id: 'home', icon: Home, labelKey: 'nav.home' },
+  { id: 'types', icon: HeartHandshake, labelKey: 'nav.types' },
   {
     id: 'ai',
-    label: '关系助手',
-    labelDesktop: 'AI 关系助手',
-    ariaLabel: 'AI 关系助手',
     icon: MessageCircleHeart,
+    labelKey: 'nav.ai',
+    labelDesktopKey: 'nav.ai_desktop',
+    ariaLabelKey: 'nav.ai_desktop',
     featured: true,
   },
-  { id: 'stats', label: '统计', icon: BarChart3 },
-  { id: 'help', label: '帮助', icon: CircleHelp },
+  { id: 'stats', icon: BarChart3, labelKey: 'nav.stats' },
+  { id: 'help', icon: CircleHelp, labelKey: 'nav.help' },
 ]
 
 /**
@@ -27,13 +28,15 @@ const NAV_ITEMS = [
 const PILL_BASE =
   'rounded-full bg-base-card/90 backdrop-blur-md ring-1 ring-black/[0.04] shadow-[0_6px_24px_-12px_rgba(15,23,42,0.18)]'
 
-function getNavDisplayLabel(item, { desktop = false } = {}) {
-  if (desktop && item.labelDesktop) return item.labelDesktop
-  return item.label
+function getNavDisplayLabel(item, t, { desktop = false } = {}) {
+  if (desktop && item.labelDesktopKey) return t(item.labelDesktopKey)
+  return t(item.labelKey)
 }
 
-function getNavAriaLabel(item) {
-  return item.ariaLabel ?? item.labelDesktop ?? item.label
+function getNavAriaLabel(item, t) {
+  if (item.ariaLabelKey) return t(item.ariaLabelKey)
+  if (item.labelDesktopKey) return t(item.labelDesktopKey)
+  return t(item.labelKey)
 }
 
 export default function Header({
@@ -47,6 +50,10 @@ export default function Header({
 }) {
   const [typesOpen, setTypesOpen] = useState(false)
   const { openFeedback } = useFeedback()
+  const { t } = useLanguage()
+  const RESULTS = useLocalizedResults()
+  const TYPE_GROUP_META = useLocalizedTypeGroupMeta()
+  const NAV_ITEMS = NAV_ITEM_DEFS
 
   const groupedTypes = useMemo(() => {
     const grouped = { SR: [], SP: [], IR: [], IP: [] }
@@ -56,7 +63,7 @@ export default function Header({
       }
     })
     return grouped
-  }, [])
+  }, [RESULTS])
 
   function handleLogoClick(e) {
     if (onLogoHome) {
@@ -92,7 +99,7 @@ export default function Header({
             href="/"
             onClick={handleLogoClick}
             className="flex shrink-0 items-center gap-2 h-11 sm:h-12 rounded-full px-2 -mx-2 transition-colors hover:bg-black/[0.035]"
-            aria-label="返回首页"
+            aria-label={t('nav.back_to_home')}
           >
             <img
               src="/logo.png"
@@ -116,7 +123,7 @@ export default function Header({
               PILL_BASE,
               'hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-0.5 px-1.5 h-12',
             ].join(' ')}
-            aria-label="主导航"
+            aria-label={t('nav.home')}
           >
             {NAV_ITEMS.map((item) => {
               const Icon = item.icon
@@ -150,10 +157,10 @@ export default function Header({
                       className={[baseInner, innerClass].join(' ')}
                       onClick={() => handleNavigate(item.id)}
                       aria-current={isActive ? 'page' : undefined}
-                      aria-label={getNavAriaLabel(item)}
+                      aria-label={getNavAriaLabel(item, t)}
                     >
                       <Icon size={14} aria-hidden />
-                      <span>{getNavDisplayLabel(item, { desktop: true })}</span>
+                      <span>{getNavDisplayLabel(item, t, { desktop: true })}</span>
                     </button>
                     <AnimatePresence>
                       {typesOpen && (
@@ -206,28 +213,31 @@ export default function Header({
                   className={[baseInner, innerClass].join(' ')}
                   onClick={() => handleNavigate(item.id)}
                   aria-current={isActive ? 'page' : undefined}
-                  aria-label={getNavAriaLabel(item)}
+                  aria-label={getNavAriaLabel(item, t)}
                 >
                   <Icon size={14} aria-hidden />
-                  <span>{getNavDisplayLabel(item, { desktop: true })}</span>
+                  <span>{getNavDisplayLabel(item, t, { desktop: true })}</span>
                 </button>
               )
             })}
           </nav>
 
-          {/* ── 反馈：右上角，直接坐在背景上，无白色容器 ────────── */}
-          <button
-            type="button"
-            onClick={openFeedback}
-            className={[
-              'ml-auto inline-flex shrink-0 items-center justify-center gap-1.5 h-11 sm:h-12 w-11 sm:w-auto sm:px-3 rounded-full',
-              '-mr-2 sm:-mr-3 text-base-mute transition-colors hover:text-brand-cyan hover:bg-black/[0.035]',
-            ].join(' ')}
-            aria-label="问题反馈"
-          >
-            <MessageSquarePlus size={17} aria-hidden />
-            <span className="hidden sm:inline text-[14px] font-medium leading-none">反馈</span>
-          </button>
+          {/* ── 右上角：语言切换器 + 反馈 ────────────────────────── */}
+          <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2 -mr-2 sm:-mr-3">
+            <LanguageSwitcher />
+            <button
+              type="button"
+              onClick={openFeedback}
+              className={[
+                'inline-flex shrink-0 items-center justify-center gap-1.5 h-11 sm:h-12 w-11 sm:w-auto sm:px-3 rounded-full',
+                'text-base-mute transition-colors hover:text-brand-cyan hover:bg-black/[0.035]',
+              ].join(' ')}
+              aria-label={t('nav.open_feedback')}
+            >
+              <MessageSquarePlus size={17} aria-hidden />
+              <span className="hidden sm:inline text-[14px] font-medium leading-none">{t('nav.feedback')}</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -235,7 +245,7 @@ export default function Header({
       <nav
         className="md:hidden fixed bottom-0 left-0 right-0 z-50 px-3 pointer-events-none"
         style={{ paddingBottom: 'max(0.75rem, calc(env(safe-area-inset-bottom) + 0.5rem))' }}
-        aria-label="主导航"
+        aria-label={t('nav.home')}
       >
         <div
           className={[
@@ -263,7 +273,7 @@ export default function Header({
                 ].join(' ')}
                 onClick={() => handleNavigate(item.id)}
                 aria-current={isActive ? 'page' : undefined}
-                aria-label={getNavAriaLabel(item)}
+                aria-label={getNavAriaLabel(item, t)}
               >
                 <span
                   className={[
@@ -276,7 +286,7 @@ export default function Header({
                   <Icon size={item.featured ? 23 : 16} className="-translate-y-px" aria-hidden />
                 </span>
                 <span className={[item.featured ? 'text-[11px] font-bold leading-none' : 'text-[11px] leading-none font-medium', homeNudgeClass].join(' ')}>
-                  {getNavDisplayLabel(item)}
+                  {getNavDisplayLabel(item, t)}
                 </span>
               </button>
             )

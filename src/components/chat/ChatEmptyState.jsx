@@ -1,60 +1,66 @@
 import { ArrowUpRight, Compass, Flame, HeartHandshake, MessageCircleHeart } from 'lucide-react'
+import { useLanguage } from '../../i18n/LanguageContext'
 
 const SCENE_PALETTE = [
-  { id: 'cooldown', label: '冷战修复', icon: Flame, accent: '#F4A7B0' },
-  { id: 'daily', label: '日常沟通', icon: MessageCircleHeart, accent: '#76B8E0' },
-  { id: 'upgrade', label: '亲密升级', icon: HeartHandshake, accent: '#B8A0D0' },
-  { id: 'self', label: '自我觉察', icon: Compass, accent: '#8ED6B4' },
+  { id: 'cooldown', labelKey: 'chat.empty_scene_cooldown', icon: Flame, accent: '#F4A7B0' },
+  { id: 'daily', labelKey: 'chat.empty_scene_daily', icon: MessageCircleHeart, accent: '#76B8E0' },
+  { id: 'upgrade', labelKey: 'chat.empty_scene_upgrade', icon: HeartHandshake, accent: '#B8A0D0' },
+  { id: 'self', labelKey: 'chat.empty_scene_self', icon: Compass, accent: '#8ED6B4' },
 ]
 
-function buildScenes(context) {
-  const code = context?.code || '这类关系'
+function buildScenes(context, t) {
+  const code = context?.code || t('chat.empty_fallback_code')
   const isDual = context?.mode === 'dual'
 
   return [
     {
       ...SCENE_PALETTE[0],
+      label: t(SCENE_PALETTE[0].labelKey),
       prompts: [
-        `${code} 型最容易因为什么小事吵起来？`,
-        '一个人想靠近、一个人想冷静时该怎么开口？',
-        '我已经道歉了 TA 还没回应，该等还是再开一次口？',
+        t('chat.empty_prompt_cooldown_1', { code }),
+        t('chat.empty_prompt_cooldown_2'),
+        t('chat.empty_prompt_cooldown_3'),
       ],
     },
     {
       ...SCENE_PALETTE[1],
+      label: t(SCENE_PALETTE[1].labelKey),
       prompts: [
-        '给我们一个今晚就能试的 5 分钟沟通练习。',
-        '怎么让 TA 知道我不是在挑刺，只是想说我的感受？',
-        isDual ? '哪个维度上我们最容易误解对方？' : '怎么主动问 TA 一些深入但不冒犯的问题？',
+        t('chat.empty_prompt_daily_1'),
+        t('chat.empty_prompt_daily_2'),
+        isDual ? t('chat.empty_prompt_daily_3_dual') : t('chat.empty_prompt_daily_3_single'),
       ],
     },
     {
       ...SCENE_PALETTE[2],
+      label: t(SCENE_PALETTE[2].labelKey),
       prompts: [
-        '想给 TA 一份不要钱但走心的小惊喜，有什么思路？',
-        '怎么聊一聊未来一年的关系节奏，不让对方感到压力？',
-        '最近变成搭子状态，怎么把心动感找回来一点？',
+        t('chat.empty_prompt_upgrade_1'),
+        t('chat.empty_prompt_upgrade_2'),
+        t('chat.empty_prompt_upgrade_3'),
       ],
     },
     {
       ...SCENE_PALETTE[3],
+      label: t(SCENE_PALETTE[3].labelKey),
       prompts: [
-        `${code} 型在关系里最常忽略的需求是什么？`,
-        '我担心自己付出太多，怎么判断是爱还是自我感动？',
-        '焦虑「TA 是不是不爱我了」，可以怎么自我安抚？',
+        t('chat.empty_prompt_self_1', { code }),
+        t('chat.empty_prompt_self_2'),
+        t('chat.empty_prompt_self_3'),
       ],
     },
   ]
 }
 
 export default function ChatEmptyState({ context, disabled = false, onPick }) {
-  const scenes = buildScenes(context)
+  const { t } = useLanguage()
+  const scenes = buildScenes(context, t)
 
   return (
     <div className="mx-auto w-full max-w-4xl px-1 pt-6 pb-2 md:pt-10">
       {/* 极简引导：仅保留一句核心提问 */}
       <h2 className="mb-6 text-[20px] font-extrabold leading-tight text-base-text md:mb-9 md:text-[26px]">
-        今天，<span className="text-base-mute">想跟我聊些什么？</span>
+        {t('chat.empty_title_lead')}<span className="text-base-mute">{t('chat.empty_title_rest')}</span>
       </h2>
 
       {/* 4 场景 — 桌面端 4 列，平板 2 列，移动 1 列；hairline 分隔，去卡片 */}

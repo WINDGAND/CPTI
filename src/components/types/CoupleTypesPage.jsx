@@ -1,19 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
-import { RESULTS } from '../../data/results'
-import { TYPE_GROUP_META, TYPE_GROUP_ORDER } from '../../data/typeGroups'
+import { TYPE_GROUP_ORDER } from '../../data/typeGroups'
 import { getTypeListingIntro } from '../../utils/typeListing'
 import { getTypeImageSources } from '../../data/typeImages'
 import { recordImageMetric } from '../../utils/imageMetrics'
+import { useLanguage } from '../../i18n/LanguageContext'
+import { useLocalizedResults, useLocalizedTypeGroupMeta } from '../../i18n/useLocalizedData'
 
-function StartTestButton({ onClick }) {
+function StartTestButton({ onClick, label }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className="inline-flex items-center justify-center gap-2 rounded-full bg-brand-cyan px-8 py-3.5 text-sm font-semibold text-white shadow-md transition hover:opacity-90 active:scale-[0.98]"
     >
-      开始测试
+      {label}
       <ArrowRight className="h-4 w-4 shrink-0" strokeWidth={2.5} aria-hidden />
     </button>
   )
@@ -68,7 +69,7 @@ function TypeIllustration({ code, priority = false }) {
     return (
       <div
         className="w-full max-w-[220px] aspect-[4/5] rounded-xl border border-base-text/10 bg-white/30 flex items-center justify-center mb-4 mx-auto"
-        aria-label={`${code} 配图占位`}
+        aria-label={code}
       >
         <div className="h-10 w-10 rounded-lg bg-base-text/10" />
       </div>
@@ -99,6 +100,9 @@ function TypeIllustration({ code, priority = false }) {
  * 情侣类型总览页：全宽色带、居中文案、斜切衔接、public/images/cpti/{CODE}.png
  */
 export default function CoupleTypesPage({ onStartTest }) {
+  const { t } = useLanguage()
+  const RESULTS = useLocalizedResults()
+  const TYPE_GROUP_META = useLocalizedTypeGroupMeta()
   const byGroup = TYPE_GROUP_ORDER.reduce((acc, key) => {
     acc[key] = RESULTS.filter((r) => r.group === key)
     return acc
@@ -108,10 +112,10 @@ export default function CoupleTypesPage({ onStartTest }) {
     <div className="pb-12 bg-base-card">
       <header className="text-center -mx-4 px-4 pt-6 pb-6 md:pt-10 md:pb-8 bg-base-card">
         <h1 className="text-3xl md:text-4xl font-extrabold text-base-text tracking-tight">
-          情侣类型
+          {t('types.title')}
         </h1>
         <div className="mt-8 flex justify-center">
-          <StartTestButton onClick={onStartTest} />
+          <StartTestButton onClick={onStartTest} label={t('common.start_test')} />
         </div>
       </header>
 
@@ -179,7 +183,7 @@ export default function CoupleTypesPage({ onStartTest }) {
                         {type.code}
                       </p>
                       <p className="mt-2 text-sm text-base-mute leading-relaxed text-center w-full max-w-[15.5rem] sm:max-w-[17rem] lg:max-w-[15rem] xl:max-w-[16rem] mx-auto">
-                        {getTypeListingIntro(type)}
+                        {getTypeListingIntro(type, { emptyFallback: t('types.listing_empty') })}
                       </p>
                     </article>
                   ))}
@@ -191,7 +195,7 @@ export default function CoupleTypesPage({ onStartTest }) {
       </div>
 
       <footer className="flex justify-center pt-10 pb-4">
-        <StartTestButton onClick={onStartTest} />
+        <StartTestButton onClick={onStartTest} label={t('common.start_test')} />
       </footer>
     </div>
   )

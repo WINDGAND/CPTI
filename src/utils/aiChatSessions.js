@@ -136,11 +136,24 @@ function writeStore(context, store) {
   return safe
 }
 
-export function deriveTitle(messages) {
+/** 各语言下的默认会话标题（持久化里可能混存，展示时需统一映射） */
+export const DEFAULT_SESSION_TITLES = new Set(['新的对话', 'New chat', 'New Chat'])
+
+export function isDefaultSessionTitle(title) {
+  const clean = String(title || '').trim()
+  return !clean || DEFAULT_SESSION_TITLES.has(clean)
+}
+
+export function deriveTitle(messages, defaultTitle = '') {
   const firstUser = (Array.isArray(messages) ? messages : []).find((m) => m?.role === 'user')
   const text = String(firstUser?.content || '').replace(/\s+/g, ' ').trim()
-  if (!text) return '新的对话'
+  if (!text) return defaultTitle
   return text.length > 18 ? `${text.slice(0, 18)}…` : text
+}
+
+export function resolveSessionTitle(storedTitle, messages, defaultTitle) {
+  if (!isDefaultSessionTitle(storedTitle)) return storedTitle
+  return deriveTitle(messages, defaultTitle)
 }
 
 /* ─── public API ────────────────────────────────────────── */
@@ -161,7 +174,7 @@ export function getSession(context, sessionId) {
   return store.sessions.find((s) => s.id === sessionId) || null
 }
 
-export function createSession(context, { title = '新的对话', messages = [] } = {}) {
+export function createSession(context, { title = '', messages = [] } = {}) {
   const store = readStore(context)
   const session = sanitizeSession({
     id: genId('s'),

@@ -2,15 +2,17 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Check, MessageCirclePlus, MoreHorizontal, Pencil, Trash2, X } from 'lucide-react'
+import { useLanguage } from '../../i18n/LanguageContext'
+import { resolveSessionTitle } from '../../utils/aiChatSessions'
 
-function formatSessionTime(input) {
+function formatSessionTime(input, t) {
   try {
     const d = new Date(input)
     if (Number.isNaN(d.getTime())) return ''
     const diff = Date.now() - d.getTime()
-    if (diff < 60_000) return '刚刚'
-    if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} 分钟前`
-    if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} 小时前`
+    if (diff < 60_000) return t('chat.just_now')
+    if (diff < 3_600_000) return t('chat.minutes_ago', { n: Math.floor(diff / 60_000) })
+    if (diff < 86_400_000) return t('chat.hours_ago', { n: Math.floor(diff / 3_600_000) })
     const pad = (n) => String(n).padStart(2, '0')
     return `${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
   } catch {
@@ -19,6 +21,7 @@ function formatSessionTime(input) {
 }
 
 function SessionRow({ session, isCurrent, onSelect, onRename, onDelete }) {
+  const { t } = useLanguage()
   const [renaming, setRenaming] = useState(false)
   const [draft, setDraft] = useState(session.title || '')
   const [menuOpen, setMenuOpen] = useState(false)
@@ -137,13 +140,13 @@ function SessionRow({ session, isCurrent, onSelect, onRename, onDelete }) {
             ].join(' ')}
             title={session.title}
           >
-            {session.title || '新的对话'}
+            {resolveSessionTitle(session.title, session.messages || [], t('chat.new_chat'))}
           </p>
         )}
         <p className="mt-0.5 flex items-center gap-2 text-[11px] leading-none text-base-mute">
-          <span>{(session.messages || []).length} 条</span>
+          <span>{t('chat.chat_count', { n: (session.messages || []).length })}</span>
           <span>·</span>
-          <span>{formatSessionTime(session.updatedAt || session.createdAt)}</span>
+          <span>{formatSessionTime(session.updatedAt || session.createdAt, t)}</span>
         </p>
       </button>
 
@@ -159,7 +162,7 @@ function SessionRow({ session, isCurrent, onSelect, onRename, onDelete }) {
             isCurrent ? 'opacity-100' : '',
             renaming ? 'pointer-events-none opacity-0' : '',
           ].join(' ')}
-          aria-label="会话操作"
+          aria-label={t('chat.history')}
         >
           <MoreHorizontal size={14} />
         </button>
@@ -177,7 +180,7 @@ function SessionRow({ session, isCurrent, onSelect, onRename, onDelete }) {
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12.5px] text-base-text hover:bg-black/[0.045]"
               >
                 <Pencil size={12} />
-                重命名
+                {t('chat.rename')}
               </button>
               <button
                 type="button"
@@ -185,7 +188,7 @@ function SessionRow({ session, isCurrent, onSelect, onRename, onDelete }) {
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12.5px] text-rose-600 hover:bg-rose-50"
               >
                 <Trash2 size={12} />
-                删除
+                {t('chat.delete')}
               </button>
             </div>
           ),
@@ -196,24 +199,28 @@ function SessionRow({ session, isCurrent, onSelect, onRename, onDelete }) {
   )
 }
 
-function SessionList({ sessions, currentSessionId, onSelectSession, onRenameSession, onDeleteSession, onNewSession, footer }) {
+function SessionList({ sessions, currentSessionId, onSelectSession, onRenameSession, onDeleteSession, onNewSession, footer, topInset = false }) {
+  const { t } = useLanguage()
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="shrink-0 px-3 pb-3 pt-3">
+      {/* topInset：桌面端 sidebar 展开时，左上角"控制岛"的收起按钮会覆盖在
+          sidebar 顶部 ~10–42px 区域，所以"新建对话"主按钮需要往下让位避免重叠。
+          移动端抽屉自带关闭 header，无需 inset。 */}
+      <div className={['shrink-0 px-3 pb-3', topInset ? 'pt-14' : 'pt-3'].join(' ')}>
         <button
           type="button"
           onClick={onNewSession}
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-cyan py-2.5 text-[13px] font-semibold text-white transition-all hover:opacity-95 active:scale-[0.99]"
         >
           <MessageCirclePlus size={15} />
-          新建对话
+          {t('chat.new_session_btn')}
         </button>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2 pt-1">
         {sessions.length === 0 ? (
           <p className="px-3 pt-8 text-center text-[12px] leading-6 text-base-mute/80">
-            还没有任何对话
+            {t('chat.history_empty')}
           </p>
         ) : (
           <ul className="space-y-0.5">
@@ -250,6 +257,8 @@ export default function ChatSessionDrawer({
   collapsed = false,
   footer,
 }) {
+  const langCtx = useLanguage()
+  const dictT = langCtx.t
   if (variant === 'desktop') {
     return (
       <aside
@@ -257,7 +266,7 @@ export default function ChatSessionDrawer({
           'relative hidden md:flex h-full shrink-0 flex-col overflow-hidden transition-[width] duration-300 ease-out',
           collapsed ? 'w-0' : 'w-[260px]',
         ].join(' ')}
-        aria-label="对话历史"
+        aria-label={dictT('chat.history')}
         aria-hidden={collapsed}
       >
         {/* 用一个固定宽度的内层包裹，配合外层 w-0/w-[260px] 切换实现平滑收起 */}
@@ -275,6 +284,7 @@ export default function ChatSessionDrawer({
             onDeleteSession={onDeleteSession}
             onNewSession={onNewSession}
             footer={footer}
+            topInset
           />
         </div>
         {/* 右侧 hairline 列分隔，比 border + bg 更原生 */}
@@ -309,15 +319,15 @@ export default function ChatSessionDrawer({
             transition={{ type: 'tween', ease: [0.22, 0.61, 0.36, 1], duration: 0.28 }}
             className="fixed bottom-0 right-0 top-0 z-[70] flex w-[88vw] max-w-[340px] flex-col bg-white shadow-2xl md:hidden"
             style={{ paddingTop: 'env(safe-area-inset-top)' }}
-            aria-label="对话历史"
+            aria-label={dictT('chat.history')}
           >
             <div className="flex shrink-0 items-center justify-between px-4 py-3">
-              <p className="text-[14px] font-bold text-base-text">对话历史</p>
+              <p className="text-[14px] font-bold text-base-text">{dictT('chat.history')}</p>
               <button
                 type="button"
                 onClick={onClose}
                 className="flex h-9 w-9 items-center justify-center rounded-full text-base-mute hover:bg-black/[0.06] hover:text-base-text"
-                aria-label="关闭"
+                aria-label={dictT('common.close')}
               >
                 <X size={17} />
               </button>

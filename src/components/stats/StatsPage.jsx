@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { ArrowRight, Sparkles, TrendingDown, TrendingUp } from 'lucide-react'
 import { fetchStatsSummary } from '../../utils/statsApi'
+import { useLanguage } from '../../i18n/LanguageContext'
+import { useLocalizedResults, useLocalizedTypeGroupMeta } from '../../i18n/useLocalizedData'
 
 const TYPE_COLORS = [
   '#EF476F', '#FF6B6B', '#F9844A', '#F9C74F',
@@ -40,11 +42,11 @@ const PLACEHOLDER_INSIGHTS = Array.from({ length: 3 }, (_, index) => ({
   key: `placeholder-insight-${index}`,
 }))
 
-function formatNumber(value) {
-  return new Intl.NumberFormat('zh-CN').format(value)
+function formatNumber(value, locale = 'zh-CN') {
+  return new Intl.NumberFormat(locale).format(value)
 }
 
-function CountUpNumber({ target }) {
+function CountUpNumber({ target, locale = 'zh-CN' }) {
   const [display, setDisplay] = useState(0)
 
   useEffect(() => {
@@ -64,7 +66,7 @@ function CountUpNumber({ target }) {
     return () => cancelAnimationFrame(raf)
   }, [target])
 
-  return <span>{formatNumber(display)}</span>
+  return <span>{formatNumber(display, locale)}</span>
 }
 
 function PrimaryButton({ children, onClick }) {
@@ -117,7 +119,12 @@ function createDonutSlicePath(cx, cy, outerR, innerR, startDeg, endDeg) {
 }
 
 export default function StatsPage({ onStartTest, onGoTypes }) {
-  const [statsData, setStatsData] = useState(null)
+  const { t, lang } = useLanguage()
+  const GROUP_META = useLocalizedTypeGroupMeta()
+  const RESULTS = useLocalizedResults()
+  const RESULTS_MAP = useMemo(() => Object.fromEntries(RESULTS.map((r) => [r.code, r])), [RESULTS])
+  const numberLocale = lang === 'en' ? 'en-US' : 'zh-CN'
+  const [statsDataRaw, setStatsDataRaw] = useState(null)
   const [requestState, setRequestState] = useState('loading')
   const [statsError, setStatsError] = useState('')
   const [metricMode, setMetricMode] = useState('percent')
@@ -125,7 +132,7 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
   const [retryCount, setRetryCount] = useState(0)
 
   const isLoading = requestState === 'loading'
-  const hasData = requestState === 'success' && !!statsData?.typeDistribution?.length
+  const hasData = requestState === 'success' && !!statsDataRaw?.typeDistribution?.length
   const isError = requestState === 'error'
 
   useEffect(() => {
@@ -136,22 +143,78 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
       try {
         const remote = await fetchStatsSummary()
         if (disposed || !remote?.typeDistribution?.length) return
-        setStatsData(remote)
+        setStatsDataRaw(remote)
         setActiveCode(remote.typeDistribution[0]?.code ?? null)
         setRequestState('success')
         setStatsError('')
       } catch {
         if (disposed) return
-        setStatsData(null)
+        setStatsDataRaw(null)
         setActiveCode(null)
         setRequestState('error')
-        setStatsError('获取统计数据失败，请稍后刷新重试。')
+        setStatsError(t('stats.error_fallback'))
       }
     }
 
     loadRemoteStats()
     return () => { disposed = true }
-  }, [retryCount])
+  }, [retryCount, t])
+
+  // 用当前语言改写远端数据中的 title / label / cuteTags / sourceNote / insights
+  const statsData = useMemo(() => {
+    if (!statsDataRaw) return null
+    const enrichTitle = (item) => ({
+      ...item,
+      title: RESULTS_MAP?.[item?.code]?.title ?? item.title,
+    })
+    const cuteTagsLocalized = lang === 'en'
+      ? [t('stats.cute_tag_today'), t('stats.cute_tag_sample'), t('stats.cute_tag_reference'), t('stats.cute_tag_no_rank')]
+      : statsDataRaw.cuteTags
+    const localizedInsights = (statsDataRaw.insights || []).map((insight, idx) => {
+      if (lang === 'zh') return insight
+      // insight 是包含 title / value / note 的对象；按位置覆盖
+      const sorted = [...statsDataRaw.typeDistribution].sort((a, b) => b.percent - a.percent)
+      const top = sorted[0]
+      const bottom = sorted[sorted.length - 1]
+      if (idx === 0 && top) {
+        const title = RESULTS_MAP?.[top.code]?.title ?? top.title
+        return {
+          title: t('stats.insight_top_title'),
+          value: `${top.code} · ${title}`,
+          note: t('stats.insight_top_note', { percent: top.percent.toFixed(1) }),
+        }
+      }
+      if (idx === 1 && bottom) {
+        const title = RESULTS_MAP?.[bottom.code]?.title ?? bottom.title
+        return {
+          title: t('stats.insight_bottom_title'),
+          value: `${bottom.code} · ${title}`,
+          note: t('stats.insight_bottom_note', { percent: bottom.percent.toFixed(1) }),
+        }
+      }
+      if (idx === 2) {
+        return {
+          title: t('stats.insight_color_title'),
+          value: t('stats.insight_color_value'),
+          note: t('stats.insight_color_note'),
+        }
+      }
+      return insight
+    })
+    return {
+      ...statsDataRaw,
+      typeDistribution: (statsDataRaw.typeDistribution || []).map(enrichTitle),
+      groupDistribution: (statsDataRaw.groupDistribution || []).map((item) => ({
+        ...item,
+        label: GROUP_META?.[item.group]?.label ?? item.label,
+      })),
+      top3: (statsDataRaw.top3 || []).map(enrichTitle),
+      bottom3: (statsDataRaw.bottom3 || []).map(enrichTitle),
+      cuteTags: cuteTagsLocalized,
+      sourceNote: lang === 'en' ? t('stats.source_note_demo') : statsDataRaw.sourceNote,
+      insights: localizedInsights,
+    }
+  }, [statsDataRaw, lang, GROUP_META, t, RESULTS_MAP])
 
   const typeColorMap = useMemo(() => {
     if (!hasData) return {}
@@ -204,12 +267,12 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
   return (
     <div className="pb-10">
       <header className="pt-4 pb-8 text-center md:pt-8">
-        <p className="text-eyebrow">CPTI · DATA VIEW</p>
-        <h1 className="mt-2 text-2xl md:text-[32px] font-extrabold text-base-text leading-tight">CPTI 亲密关系光谱</h1>
+        <p className="text-eyebrow">{t('stats.eyebrow')}</p>
+        <h1 className="mt-2 text-2xl md:text-[32px] font-extrabold text-base-text leading-tight">{t('stats.title')}</h1>
         <p className="mx-auto mt-2 max-w-2xl text-sm leading-relaxed text-base-mute">
-          这是阶段性样本统计结果，用来帮助你观察“人群中的关系偏好分布”。
+          {t('stats.desc_line1')}
           <br />
-          数据用于理解趋势，不用于定义关系价值高低。
+          {t('stats.desc_line2')}
         </p>
 
         {/* 累计份数 — 整体居中陈列，顶部短色条做主题锚点 */}
@@ -218,18 +281,18 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
             className="h-[3px] w-10 rounded-full bg-brand-cyan"
             aria-hidden
           />
-          <p className="text-eyebrow mt-2.5">累计问卷份数</p>
+          <p className="text-eyebrow mt-2.5">{t('stats.total_label')}</p>
           <p className="font-display mt-1 text-4xl md:text-5xl font-black tabular-nums text-base-text leading-none">
             {isLoading ? (
               <span className="inline-block h-12 w-32 rounded bg-gray-200 animate-pulse" />
             ) : hasData ? (
-              <CountUpNumber target={statsData.totalSubmissions} />
+              <CountUpNumber target={statsData.totalSubmissions} locale={numberLocale} />
             ) : (
               '--'
             )}
           </p>
           <p className="mt-2 text-xs text-base-mute">
-            数据更新时间：{hasData ? statsData.lastUpdated : '--'} · {hasData ? statsData.sourceNote : '--'}
+            {t('stats.data_updated_template', { date: hasData ? statsData.lastUpdated : '--', note: hasData ? statsData.sourceNote : '--' })}
           </p>
           {isError && statsError && (
             <div className="mt-2 flex flex-col items-center gap-2">
@@ -239,7 +302,7 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
                 className="rounded-full border border-brand-cyan/30 bg-white px-3 py-1 text-xs font-semibold text-brand-cyan transition hover:bg-brand-cyan hover:text-white"
                 onClick={() => setRetryCount((count) => count + 1)}
               >
-                重试获取数据
+                {t('stats.retry')}
               </button>
             </div>
           )}
@@ -265,7 +328,7 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
                 </span>
               ))}
               <span className="inline-flex items-center rounded-full border border-gray-100 bg-white/70 backdrop-blur-sm px-3 py-1 text-xs text-base-mute">
-                在线共享数据
+                {t('stats.insights_tag_share')}
               </span>
             </>
           ) : (
@@ -281,8 +344,8 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
           <div className="flex items-start gap-3">
             <span className="mt-1 h-6 w-[3px] shrink-0 rounded-full bg-brand-cyan" aria-hidden />
             <div>
-              <p className="text-eyebrow">Distribution · 16 Types</p>
-              <h2 className="mt-1 text-lg md:text-xl font-bold text-base-text leading-snug">16 型占比</h2>
+              <p className="text-eyebrow">{t('stats.distribution_eyebrow')}</p>
+              <h2 className="mt-1 text-lg md:text-xl font-bold text-base-text leading-snug">{t('stats.distribution_title')}</h2>
             </div>
           </div>
           <div className="inline-flex rounded-full border border-gray-200 bg-white/70 p-1">
@@ -294,7 +357,7 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
               ].join(' ')}
               onClick={() => setMetricMode('percent')}
             >
-              按占比
+              {t('stats.by_percent')}
             </button>
             <button
               type="button"
@@ -304,7 +367,7 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
               ].join(' ')}
               onClick={() => setMetricMode('count')}
             >
-              按人数
+              {t('stats.by_count')}
             </button>
           </div>
         </div>
@@ -342,7 +405,7 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
                   })}
                 </svg>
                 <div className="absolute inset-[26%] rounded-full bg-white shadow-inner flex flex-col items-center justify-center text-center px-2">
-                  <p className="text-[11px] tracking-wide text-base-mute">当前高亮</p>
+                  <p className="text-[11px] tracking-wide text-base-mute">{t('stats.chart_active')}</p>
                   <p className="text-sm font-bold text-base-text">{activeType.code}</p>
                   <p className="text-[11px] text-base-mute mt-0.5 truncate max-w-full">{activeType.title}</p>
                   <p className="text-xs font-semibold text-brand-cyan mt-0.5">
@@ -352,7 +415,7 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
               </motion.div>
             )}
             <p className="mt-2 text-center text-xs text-base-mute">
-              提示：悬浮或点击任意扇区，查看对应 CPTI 信息
+              {t('stats.chart_tip')}
             </p>
           </div>
 
@@ -360,7 +423,7 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
             {rankedTypes.map((item, idx) => {
               const rank = idx + 1
               const valueText = metricMode === 'count'
-                ? `${formatNumber(item.count)} 人`
+                ? (lang === 'en' ? formatNumber(item.count, numberLocale) : `${formatNumber(item.count, numberLocale)} 人`)
                 : `${item.percent.toFixed(1)}%`
               const isActive = activeType?.code === item.code
               return (
@@ -404,8 +467,8 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
           <div className="flex items-start gap-3 mb-5">
             <span className="mt-1 h-6 w-[3px] shrink-0 rounded-full" style={{ background: 'linear-gradient(180deg, #F4A7B0, #8ED6B4)' }} aria-hidden />
             <div>
-              <p className="text-eyebrow">Color Group Share</p>
-              <h2 className="mt-1 text-lg md:text-xl font-bold text-base-text leading-snug">四色系占比</h2>
+              <p className="text-eyebrow">{t('stats.color_eyebrow')}</p>
+              <h2 className="mt-1 text-lg md:text-xl font-bold text-base-text leading-snug">{t('stats.color_title')}</h2>
             </div>
           </div>
           <div className="mt-4 space-y-4">
@@ -414,7 +477,11 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-semibold text-base-text">{item.label}</span>
                   <span className="font-display tabular-nums text-base-mute">
-                    {hasData ? `${item.percent.toFixed(1)}% · ${formatNumber(item.count)} 人` : '--'}
+                    {hasData
+                      ? (lang === 'en'
+                        ? `${item.percent.toFixed(1)}% · ${formatNumber(item.count, numberLocale)}`
+                        : `${item.percent.toFixed(1)}% · ${formatNumber(item.count, numberLocale)} 人`)
+                      : '--'}
                   </span>
                 </div>
                 <div className="h-1.5 rounded-full bg-gray-100/80 overflow-hidden">
@@ -438,8 +505,8 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
           <div className="flex items-start gap-3 mb-5">
             <span className="mt-1 h-6 w-[3px] shrink-0 rounded-full bg-brand-cyan" aria-hidden />
             <div>
-              <p className="text-eyebrow">Insights</p>
-              <h2 className="mt-1 text-lg md:text-xl font-bold text-base-text leading-snug">趣味洞察</h2>
+              <p className="text-eyebrow">{t('stats.insights_eyebrow')}</p>
+              <h2 className="mt-1 text-lg md:text-xl font-bold text-base-text leading-snug">{t('stats.insights_title')}</h2>
             </div>
           </div>
           <div className="space-y-5">
@@ -470,9 +537,9 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
           <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-full bg-emerald-500/70" aria-hidden />
           <div className="flex items-center gap-2 mb-3">
             <TrendingUp size={15} className="text-emerald-600" aria-hidden />
-            <p className="text-eyebrow" style={{ color: '#059669' }}>Top 3 · Most Frequent</p>
+            <p className="text-eyebrow" style={{ color: '#059669' }}>{t('stats.top_eyebrow')}</p>
           </div>
-          <h3 className="text-sm font-bold text-base-text mb-3">高频类型</h3>
+          <h3 className="text-sm font-bold text-base-text mb-3">{t('stats.top_title')}</h3>
           <ol className="space-y-2">
             {(hasData ? statsData.top3 : PLACEHOLDER_TOP_BOTTOM).map((item, idx) => (
               <li key={item.code === '--' ? item.key : item.code} className="flex items-baseline gap-2.5 text-sm">
@@ -493,9 +560,9 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
           <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-full bg-amber-400/70" aria-hidden />
           <div className="flex items-center gap-2 mb-3">
             <TrendingDown size={15} className="text-amber-600" aria-hidden />
-            <p className="text-eyebrow" style={{ color: '#d97706' }}>Top 3 · Rarest</p>
+            <p className="text-eyebrow" style={{ color: '#d97706' }}>{t('stats.bottom_eyebrow')}</p>
           </div>
-          <h3 className="text-sm font-bold text-base-text mb-3">稀有类型</h3>
+          <h3 className="text-sm font-bold text-base-text mb-3">{t('stats.bottom_title')}</h3>
           <ol className="space-y-2">
             {(hasData ? statsData.bottom3 : PLACEHOLDER_TOP_BOTTOM).map((item, idx) => (
               <li key={item.code === '--' ? item.key : item.code} className="flex items-baseline gap-2.5 text-sm">
@@ -515,11 +582,11 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
 
       <footer className="mt-12 pt-8 border-t border-gray-100 text-center">
         <p className="mb-5 text-sm text-base-mute">
-          看完人群趋势后，不妨回到你们自己的关系现场，做一次真正属于你们的测评。
+          {t('stats.footer_text')}
         </p>
         <div className="flex flex-wrap items-center justify-center gap-3">
-          <PrimaryButton onClick={onStartTest}>开始测试</PrimaryButton>
-          <GhostButton onClick={onGoTypes}>查看情侣类型</GhostButton>
+          <PrimaryButton onClick={onStartTest}>{t('common.start_test')}</PrimaryButton>
+          <GhostButton onClick={onGoTypes}>{t('stats.view_types')}</GhostButton>
         </div>
       </footer>
     </div>

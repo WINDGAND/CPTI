@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
+import { useLanguage } from '../i18n/LanguageContext'
 
 /**
  * Loading — 光谱融合三幕剧本（PRD 3.2.2 升级版）
@@ -34,6 +35,7 @@ export default function Loading({
   minDurationMs = 800,
   preloadTask = Promise.resolve(),
 }) {
+  const { t } = useLanguage()
   const [letterIdx, setLetterIdx] = useState(0)
 
   // 字母轮转动画（仅在 Act 2 视觉上有意义，但持续运行不影响其它幕）
@@ -179,9 +181,9 @@ export default function Loading({
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.25, duration: 0.4 }}
       >
-        <p className="text-eyebrow mb-1.5">Reading your spectrum</p>
+        <p className="text-eyebrow mb-1.5">{t('loading.eyebrow')}</p>
         <p className="text-sm text-base-text font-medium tracking-wide">
-          正在分析你们的亲密光谱
+          {t('loading.text')}
           <motion.span
             initial={{ opacity: 0 }}
             animate={{ opacity: [0, 1, 0] }}

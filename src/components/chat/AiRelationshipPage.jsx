@@ -1,6 +1,7 @@
 import { ArrowLeft } from 'lucide-react'
 import { getResultThemeClass } from '../../utils/resultTheme'
 import AiRelationshipChat from './AiRelationshipChat'
+import { useLanguage } from '../../i18n/LanguageContext'
 
 /**
  * AiRelationshipPage —— AI 关系助手页（轻量壳）
@@ -12,6 +13,7 @@ import AiRelationshipChat from './AiRelationshipChat'
  * - 高度撑满视口：扣除顶栏（桌面端 80px）与移动端底部 Tab（约 72px + safe-area）
  */
 export default function AiRelationshipPage({ resultData, onBackToResult }) {
+  const { t } = useLanguage()
   const themeClass = getResultThemeClass(resultData)
 
   const backButton = (
@@ -19,10 +21,10 @@ export default function AiRelationshipPage({ resultData, onBackToResult }) {
       type="button"
       onClick={onBackToResult}
       className="group inline-flex h-8 shrink-0 items-center gap-1 rounded-md px-1.5 text-[12.5px] font-semibold text-base-text transition-colors hover:bg-black/[0.045]"
-      aria-label="返回结果报告"
+      aria-label={t('ai.back_to_result')}
     >
       <ArrowLeft size={14} className="transition-transform group-hover:-translate-x-0.5" aria-hidden />
-      <span className="hidden sm:inline">返回报告</span>
+      <span className="hidden sm:inline">{t('ai.back_short')}</span>
     </button>
   )
 

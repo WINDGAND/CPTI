@@ -1,0 +1,56 @@
+/**
+ * 32 题英文翻译，按 id 索引（仅 text 字段，dimension/polarity 不翻译）。
+ */
+export const QUESTION_TEXT_EN = {
+  'SI-1': 'When both of us are free on weekends, we usually spend the time together rather than going our separate ways.',
+  'DA-1': "After a small fight, we usually try to talk it through quickly rather than letting it sit.",
+  'RP-1': 'On meaningful dates we expect to feel that the day is being taken seriously.',
+  'OF-1': 'Before heading out, we tend to lock down the timing and route in advance.',
+  'DA-2': 'When emotions run high we pause the conversation, even if it means the issue gets discussed later.',
+  'SI-2': 'Even in a steady relationship, we still need alone time to recharge.',
+  'OF-2': "When a new idea pops up, we're usually fine with changing the plan.",
+  'RP-2': 'Rather than orchestrating surprises, we more often show we care by handling the everyday well.',
+  'OF-3': 'If a shared expense has no budget set, we feel clearly uneasy.',
+  'RP-3': 'Even when life is busy, we still carve out little "date-like" moments for each other.',
+  'SI-3': 'When we are apart for a few days, we actively make time to call or catch up in depth.',
+  'DA-3': "When something feels off, we tend to say it out loud rather than bottle it up.",
+  'RP-4': 'When one of us is going through a rough patch, we focus on solving practical problems first.',
+  'OF-4': 'We are usually fine with last-minute changes to today\'s plan.',
+  'DA-4': 'When a fight escalates, we are more likely to cool down before resolving who is right.',
+  'SI-4': "We can spend long stretches in the same room doing our own thing without feeling distant.",
+  'SI-5': 'After the workday ends, we typically protect a fixed slice of time for each other.',
+  'DA-5': "When we disagree, we'd rather get to the heart of it as soon as possible.",
+  'OF-5': "Once a plan is agreed in advance, we're uncomfortable when it shifts last minute.",
+  'RP-5': 'Small arrangements with a sense of ritual genuinely make us feel more loved.',
+  'RP-6': 'When giving gifts or expressing care, we value usefulness more than surprise.',
+  'SI-6': "Even living in the same city, we don't really need to keep tabs on each other's plans in real time.",
+  'DA-6': "When the other is upset, we tend to give space first rather than push for answers on the spot.",
+  'OF-6': "If a new plan comes up after work, we can switch gears quickly.",
+  'OF-7': "On big decisions like moving or changing jobs, we struggle to move forward without sorting the information first.",
+  'DA-7': "Even on awkward topics, we proactively set aside time to talk them through.",
+  'RP-7': 'When we travel together, we make a point of creating moments that are "just ours".',
+  'SI-7': "For social occasions that involve both of us (friend gatherings, family events), we prefer to show up together.",
+  'DA-8': 'Some conflicts we deliberately leave for later — talking about them then usually works better than on the spot.',
+  'OF-8': 'On trips, we prefer figuring out food and lodging on the fly rather than scheduling everything ahead.',
+  'SI-8': 'When we see each other less often, we usually do not immediately worry that intimacy is fading.',
+  'RP-8': 'Compared to planning "romantic projects", we enjoy the quiet rhythm of steady daily life more.',
+}
+
+export const QUESTION_MODE_COPY_EN = {
+  single: {
+    badge: 'Solo perception',
+    title: 'See us through your eyes first',
+    description: "You'll answer from your own true feelings; the result shows how you understand the relationship — not a final shared verdict.",
+    hint: "Just choose what feels closest. You're not answering for the other person.",
+    cta: 'Capture my perception',
+    progressLabel: 'Your perspective',
+  },
+  dual: {
+    badge: 'Two-player puzzle',
+    title: 'Build the real us together',
+    description: "You'll each answer independently. We'll merge both views to produce the final Couple Type and call out where you align and where you differ.",
+    hint: 'Answer independently — no peeking, and you do not need to agree.',
+    cta: 'Start with player one',
+    progressLabel: 'Current player',
+  },
+}

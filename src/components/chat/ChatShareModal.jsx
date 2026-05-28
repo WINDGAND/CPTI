@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Check, Copy, Download, Image as ImageIcon, Loader2, X } from 'lucide-react'
 import { copyTextToClipboard, exportElementAsImage, toMarkdown } from '../../utils/aiChatExport'
 import AiMessageContent from './AiMessageContent'
+import { useLanguage } from '../../i18n/LanguageContext'
 
 const POSTER_THEME_BG = {
   'theme-pink':   { gradient: 'linear-gradient(160deg, #FFF5F7 0%, #FFE2E8 100%)', accent: '#F4A7B0' },
@@ -22,8 +23,10 @@ export default function ChatShareModal({
   messages,
   context,
   themeClass = 'theme-blue',
-  sessionTitle = '对话精选',
+  sessionTitle,
 }) {
+  const { t } = useLanguage()
+  const resolvedSessionTitle = sessionTitle || t('chat.selected_collection_title')
   const posterRef = useRef(null)
   const [copyState, setCopyState] = useState('idle') // idle | done | fail
   const [exportState, setExportState] = useState('idle') // idle | busy | done | fail
@@ -40,7 +43,7 @@ export default function ChatShareModal({
 
   async function handleCopyMarkdown() {
     if (copyState === 'done') return
-    const md = toMarkdown(exportMessages, { context, title: sessionTitle })
+    const md = toMarkdown(exportMessages, { context, title: resolvedSessionTitle })
     const ok = await copyTextToClipboard(md)
     setCopyState(ok ? 'done' : 'fail')
     setTimeout(() => setCopyState('idle'), 1800)
@@ -87,19 +90,21 @@ export default function ChatShareModal({
           >
             <div className="flex shrink-0 items-start justify-between gap-3 border-b border-gray-100 px-5 py-4 sm:px-6">
               <div>
-                <p className="text-eyebrow">Share · Export</p>
+                <p className="text-eyebrow">{t('chat.share_eyebrow')}</p>
                 <h3 className="mt-1 text-[17px] font-bold leading-snug text-base-text">
-                  分享 / 导出当前对话
+                  {t('chat.share_modal_title')}
                 </h3>
                 <p className="mt-1 text-[12px] leading-5 text-base-mute">
-                  共 {exportMessages.length} 条消息 · {context?.code ? `${context.code} 结果` : 'CPTI 助手'}
+                  {context?.code
+                    ? t('chat.share_modal_count_with_code', { n: exportMessages.length, code: context.code })
+                    : t('chat.share_modal_count_no_code', { n: exportMessages.length })}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={onClose}
                 className="flex h-9 w-9 items-center justify-center rounded-full text-base-mute hover:bg-black/[0.06] hover:text-base-text"
-                aria-label="关闭"
+                aria-label={t('chat.share_close')}
               >
                 <X size={17} />
               </button>
@@ -109,7 +114,7 @@ export default function ChatShareModal({
               {/* 海报预览 */}
               <div className="min-h-0 overflow-y-auto bg-gray-50/70 p-4 sm:p-5">
                 <div className="mx-auto w-full max-w-xl">
-                  <p className="mb-2 px-1 text-[11px] uppercase tracking-[0.18em] text-base-mute">Preview</p>
+                  <p className="mb-2 px-1 text-[11px] uppercase tracking-[0.18em] text-base-mute">{t('chat.share_preview')}</p>
                   <div
                     ref={posterRef}
                     className={`overflow-hidden rounded-2xl shadow-[0_18px_60px_-25px_rgba(15,23,42,0.4)] ${themeClass}`}
@@ -123,10 +128,10 @@ export default function ChatShareModal({
                         className="font-display text-[11px] font-semibold uppercase tracking-[0.18em]"
                         style={{ color: theme.accent }}
                       >
-                        CPTI · AI Relationship
+                        {t('chat.share_poster_eyebrow')}
                       </p>
                       <h4 className="mt-2 text-[20px] font-extrabold leading-snug text-base-text">
-                        {sessionTitle || '关于我们的一段对话'}
+                        {resolvedSessionTitle || t('chat.share_poster_title_fallback')}
                       </h4>
                       <div className="mt-2 flex items-center gap-2.5">
                         <span
@@ -143,7 +148,7 @@ export default function ChatShareModal({
                     <div className="space-y-4 px-6 py-6">
                       {exportMessages.length === 0 ? (
                         <p className="py-10 text-center text-[13px] text-base-mute">
-                          这条对话还没有内容可以导出。
+                          {t('chat.share_empty')}
                         </p>
                       ) : (
                         exportMessages.map((msg) => {
@@ -179,7 +184,7 @@ export default function ChatShareModal({
 
               {/* 操作面板 */}
               <div className="shrink-0 border-t border-gray-100 bg-white p-4 md:w-[260px] md:border-l md:border-t-0 md:p-5">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-base-mute">Actions</p>
+                <p className="text-[11px] uppercase tracking-[0.18em] text-base-mute">{t('chat.share_actions')}</p>
 
                 <div className="mt-3 space-y-2.5">
                   <button
@@ -192,10 +197,10 @@ export default function ChatShareModal({
                     {exportState === 'idle' && <ImageIcon size={14} />}
                     {exportState === 'done' && <Check size={14} />}
                     {exportState === 'fail' && <Download size={14} />}
-                    {exportState === 'busy' && '正在生成长图...'}
-                    {exportState === 'idle' && '导出为长图（PNG）'}
-                    {exportState === 'done' && '已保存到下载'}
-                    {exportState === 'fail' && '生成失败，再试一次'}
+                    {exportState === 'busy' && t('chat.share_export_busy')}
+                    {exportState === 'idle' && t('chat.share_export_idle')}
+                    {exportState === 'done' && t('chat.share_export_done')}
+                    {exportState === 'fail' && t('chat.share_export_fail')}
                   </button>
 
                   <button
@@ -205,17 +210,17 @@ export default function ChatShareModal({
                     className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white py-2.5 text-[13px] font-semibold text-base-text transition-colors hover:bg-black/[0.04] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {copyState === 'done'
-                      ? <><Check size={14} className="text-brand-cyan" />已复制 Markdown</>
+                      ? <><Check size={14} className="text-brand-cyan" />{t('chat.share_copy_md_done')}</>
                       : copyState === 'fail'
-                        ? <><Copy size={14} className="text-rose-500" />复制失败，再试一次</>
-                        : <><Copy size={14} />复制为 Markdown</>}
+                        ? <><Copy size={14} className="text-rose-500" />{t('chat.share_copy_md_fail')}</>
+                        : <><Copy size={14} />{t('chat.share_copy_md_idle')}</>}
                   </button>
                 </div>
 
                 <div className="mt-5 space-y-2 text-[11.5px] leading-5 text-base-mute">
-                  <p>· 长图按当前主题色生成，可保存或转发到任意社交平台。</p>
-                  <p>· Markdown 文本可粘贴到笔记 / 飞书 / Notion 等。</p>
-                  <p>· 分享前请确认对话里没有不希望公开的隐私信息。</p>
+                  <p>{t('chat.share_tip_1')}</p>
+                  <p>{t('chat.share_tip_2')}</p>
+                  <p>{t('chat.share_tip_3')}</p>
                 </div>
               </div>
             </div>

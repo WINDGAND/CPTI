@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { Send, Square, X } from 'lucide-react'
+import { useLanguage } from '../../i18n/LanguageContext'
 
 const MAX_LENGTH = 800
 
@@ -13,8 +14,10 @@ export default function ChatComposer({
   quoteText = '',
   onClearQuote,
   disabled = false,
-  placeholder = '比如：我们总因为计划变化吵架，我该怎么开口？',
+  placeholder,
 }) {
+  const { t } = useLanguage()
+  const ph = placeholder ?? t('chat.composer_placeholder')
   const textareaRef = useRef(null)
 
   useEffect(() => {
@@ -57,7 +60,7 @@ export default function ChatComposer({
           />
           <div className="min-w-0 flex-1">
             <p className="mb-0.5 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-brand-cyan/80">
-              引用 AI · Re：
+              {t('chat.quote_label')}
             </p>
             <p className="line-clamp-2 text-base-mute">{quoteText}</p>
           </div>
@@ -65,7 +68,7 @@ export default function ChatComposer({
             type="button"
             onClick={onClearQuote}
             className="shrink-0 rounded-full p-1 text-base-mute hover:bg-black/[0.06] hover:text-base-text"
-            aria-label="清除引用"
+            aria-label={t('chat.clear_quote')}
           >
             <X size={13} />
           </button>
@@ -82,7 +85,7 @@ export default function ChatComposer({
           value={value}
           onChange={(e) => onChange?.(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={placeholder}
+          placeholder={ph}
           rows={1}
           maxLength={MAX_LENGTH}
           disabled={disabled}
@@ -93,17 +96,17 @@ export default function ChatComposer({
           <button
             type="submit"
             className="flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-rose-50 px-3 text-[12.5px] font-semibold text-rose-600 transition-colors hover:bg-rose-100"
-            aria-label="停止生成"
+            aria-label={t('chat.stop_aria')}
           >
             <Square size={12} fill="currentColor" />
-            停止
+            {t('chat.stop')}
           </button>
         ) : (
           <button
             type="submit"
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-cyan text-white transition-all hover:opacity-95 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none"
             disabled={!canSend}
-            aria-label="发送给 AI 关系助手"
+            aria-label={t('chat.send_aria')}
           >
             <Send size={15} />
           </button>

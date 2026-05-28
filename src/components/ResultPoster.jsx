@@ -17,6 +17,8 @@ import { QUESTIONS } from '../data/questions'
 import { getTypeImageSources } from '../data/typeImages'
 import { recordImageMetric } from '../utils/imageMetrics'
 import { createDualInvite } from '../utils/statsApi'
+import { useLanguage } from '../i18n/LanguageContext'
+import { useLocalizedResultByCode } from '../i18n/useLocalizedData'
 
 /**
  * ResultPoster — 多分节深度报告页（8 个分区）
@@ -53,10 +55,22 @@ function Divider() {
   return <div className="result-divider" />
 }
 
-function renderSpectrum(percentages) {
+function getLocalizedDim(t, row) {
+  const k = `${row.posKey}${row.negKey}`
+  return {
+    posKey: row.posKey,
+    negKey: row.negKey,
+    title: t(`dim.${k}.title`, { fallback: row.title }),
+    posLabel: t(`dim.${k}.posLabel`, { fallback: row.posLabel }),
+    negLabel: t(`dim.${k}.negLabel`, { fallback: row.negLabel }),
+  }
+}
+
+function renderSpectrum(percentages, t) {
   return (
     <div className="space-y-4">
-      {DIMENSION_ROWS.map(({ posKey, negKey, posLabel, negLabel, title }) => {
+      {DIMENSION_ROWS.map((row) => {
+        const { posKey, negKey, posLabel, negLabel, title } = getLocalizedDim(t, row)
         const posVal = percentages[posKey] ?? 50
         const negVal = percentages[negKey] ?? 50
         return (
@@ -169,6 +183,7 @@ function ResultHeroIllustration({ code }) {
 }
 
 export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
+  const { t } = useLanguage()
   const posterRef = useRef(null)
   const [nickname1, setNickname1] = useState('')
   const [nickname2, setNickname2] = useState('')
@@ -182,16 +197,19 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
   const perception = resultData.perception
   const relationship = resultData.relationship
   const primaryProfile = isDualMode ? relationship : perception
-  const result = primaryProfile.result
+  const rawResult = primaryProfile.result
+  // 用 i18n hook 选当前语言对应的 result 文案；如果取不到，fallback 到原始（中文）数据
+  const localizedResult = useLocalizedResultByCode(rawResult?.code)
+  const result = localizedResult || rawResult
   const percentages = primaryProfile.percentages
   const modeKey = isDualMode ? 'dual' : 'single'
   const resultIntro = result.introByMode?.[modeKey]
   const differenceHint = result.differenceHintByMode?.[modeKey]
-  const soulmateResult = getResultByCode(result.soulmate)
-  const nemesisResult  = getResultByCode(result.nemesis)
+  const soulmateResult = useLocalizedResultByCode(result.soulmate) || getResultByCode(result.soulmate)
+  const nemesisResult  = useLocalizedResultByCode(result.nemesis)  || getResultByCode(result.nemesis)
 
-  const n1 = nickname1.trim() || 'TA'
-  const n2 = nickname2.trim() || '你'
+  const n1 = nickname1.trim() || t('result.nickname_default_other')
+  const n2 = nickname2.trim() || t('result.nickname_default_self')
   const canGenerateSinglePoster = nickname2.trim().length > 0
   const fromDualPreview = (() => {
     if (typeof window === 'undefined') return false
@@ -236,7 +254,7 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
         link = createDualInviteLink(created.token)
         setSingleInviteLink(link)
       } catch (error) {
-        setSingleInviteError(error?.message || '双人链接生成失败，请稍后重试。')
+        setSingleInviteError(error?.message || t('result.invite_copy_failed_dual'))
         return
       } finally {
         setSingleInviteLoading(false)
@@ -247,11 +265,11 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(link)
       } else {
-        window.prompt('复制下面的双人拼图链接', link)
+        window.prompt(t('result.invite_clipboard_prompt_dual'), link)
       }
       setInviteCopied(true)
     } catch {
-      window.prompt('复制下面的双人拼图链接', link)
+      window.prompt(t('result.invite_clipboard_prompt_dual'), link)
       setInviteCopied(true)
     }
   }
@@ -262,7 +280,7 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
     try {
       link = createSingleShareLink(QUESTIONS, perception.sourceAnswers)
     } catch {
-      setSingleInviteError('单人链接生成失败，请稍后重试。')
+      setSingleInviteError(t('result.invite_copy_failed_single'))
       return
     }
 
@@ -270,11 +288,11 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(link)
       } else {
-        window.prompt('复制下面的单人结果链接', link)
+        window.prompt(t('result.invite_clipboard_prompt_single'), link)
       }
       setShareCopied(true)
     } catch {
-      window.prompt('复制下面的单人结果链接', link)
+      window.prompt(t('result.invite_clipboard_prompt_single'), link)
       setShareCopied(true)
     }
   }
@@ -283,9 +301,9 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
     <div className="w-full max-w-none mx-auto pb-16">
       {!isDualMode && fromDualPreview && (
         <div className="mb-6 rounded-card border border-amber-200 bg-amber-50 px-4 py-3">
-          <p className="text-sm font-semibold text-amber-800">这是“你的视角”完整报告（非双人合成结果）</p>
+          <p className="text-sm font-semibold text-amber-800">{t('result.from_dual_preview_title')}</p>
           <p className="mt-1 text-xs leading-relaxed text-amber-800/90">
-            双人模式的最终 Couple Type 需要 TA 完成作答后合成。你仍可以回到上一页复制邀请链接继续拼图。
+            {t('result.from_dual_preview_desc')}
           </p>
         </div>
       )}
@@ -309,12 +327,12 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.45, duration: 0.4 }}
               >
-                {isDualMode ? 'CPTI · Couple Report' : 'CPTI · Perception Report'}
+                {isDualMode ? t('result.eyebrow_dual') : t('result.eyebrow_single')}
               </motion.p>
               <p className="text-sm sm:text-base font-semibold text-white leading-snug break-words">
                 {isDualMode
-                  ? `【${n1} & ${n2}】的亲密关系体检报告`
-                  : `【${n2}】眼中的关系感知画像`}
+                  ? t('result.hero_dual_template', { n1, n2 })
+                  : t('result.hero_single_template', { n2 })}
               </p>
               {/* 字母代码 — 逐字 stagger 入场 */}
               <div className="font-display text-[48px] min-[360px]:text-[56px] sm:text-[64px] lg:text-[80px] font-black leading-none tracking-[0.06em] text-white pt-1 drop-shadow-sm flex justify-center lg:justify-start">
@@ -363,16 +381,16 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
         >
           <div className="lg:grid lg:grid-cols-12 lg:gap-x-10 xl:gap-x-14 lg:items-start">
             <div className="lg:col-span-8 order-1">
-              <SectionHeader num="①" title="关系画像" />
+              <SectionHeader num="①" title={t('result.section_profile')} />
 
               <div className="rounded-xl border border-gray-100 bg-gray-50/90 px-4 py-3 text-left mb-5">
                 <p className="text-xs font-semibold text-base-text">
-                  {isDualMode ? '结果解释' : '单人结果说明'}
+                  {isDualMode ? t('result.intro_dual_title') : t('result.intro_single_title')}
                 </p>
                 <p className="result-prose-muted mt-2">
                   {resultIntro ?? (isDualMode
-                    ? '这份结果来自双方独立作答后的合成结果，会同时展示你们的一致部分和错位部分。'
-                    : '这份结果代表你如何理解这段关系，是你的主观感知画像，不等于双方最终完全一致的 Couple Type。')}
+                    ? t('result.intro_dual_fallback')
+                    : t('result.intro_single_fallback'))}
                 </p>
               </div>
 
@@ -388,59 +406,66 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
             </div>
 
             <aside className="lg:col-span-4 order-2 lg:sticky lg:top-24 lg:self-start mb-8 lg:mb-0 rounded-xl border border-gray-100/80 bg-base-card/80 p-4 md:p-5 shadow-sm backdrop-blur-sm">
-              <SectionHeader num="②" title={isDualMode ? '关系合成光谱' : '你的关系光谱'} />
-              {renderSpectrum(percentages)}
+              <SectionHeader num="②" title={isDualMode ? t('result.section_spectrum_dual') : t('result.section_spectrum_single')} />
+              {renderSpectrum(percentages, t)}
             </aside>
 
             <div className="lg:col-span-8 order-3 space-y-0 lg:col-start-1">
         {isDualMode && (
           <>
             <Divider />
-            <SectionHeader num="③" title="一致与错位" />
+            <SectionHeader num="③" title={t('result.section_alignment')} />
             <div className="result-list">
               <div className="rounded-xl border border-green-100 bg-green-50/60 p-4">
                 <div className="mb-3 flex items-center gap-2">
                   <Sparkles size={14} className="text-green-600" />
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-green-700">
-                    你们最一致的维度
+                    {t('result.most_aligned')}
                   </span>
                 </div>
                 <p className="text-sm font-semibold text-base-text">
-                  {resultData.alignment.mostAlignedDimension.title}
+                  {(() => {
+                    const dim = resultData.alignment.mostAlignedDimension
+                    const k = `${dim.posKey}${dim.negKey}`
+                    return t(`dim.${k}.title`, { fallback: dim.title })
+                  })()}
                 </p>
                 <p className="result-prose-muted mt-2">
-                  双方在这个维度上的一致度为 {resultData.alignment.mostAlignedDimension.consensus}%。
-                  这意味着你们对这段关系的理解高度同频，更容易形成“我们本来就是这样”的稳定默契。
+                  {t('result.aligned_template', { consensus: resultData.alignment.mostAlignedDimension.consensus })}
                 </p>
               </div>
               <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-4">
                 <div className="mb-3 flex items-center gap-2">
                   <AlertCircle size={14} className="text-amber-500" />
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-amber-700">
-                    最容易错位的维度
+                    {t('result.most_misaligned')}
                   </span>
                 </div>
                 <p className="text-sm font-semibold text-base-text">
-                  {resultData.alignment.mostMisalignedDimension.title}
+                  {(() => {
+                    const dim = resultData.alignment.mostMisalignedDimension
+                    const k = `${dim.posKey}${dim.negKey}`
+                    return t(`dim.${k}.title`, { fallback: dim.title })
+                  })()}
                 </p>
                 <p className="result-prose-muted mt-2">
-                  {differenceHint ?? '这里是你们最容易“各自觉得自己很合理”的地方。它不代表不合适，只说明双方感知落差最大，最值得在日常里多确认一次彼此真正的需要。'}
+                  {differenceHint ?? t('result.misaligned_fallback')}
                 </p>
               </div>
             </div>
 
             <Divider />
-            <SectionHeader num="④" title="双方视角对照" />
+            <SectionHeader num="④" title={t('result.section_perspectives')} />
             <div className="result-list">
               {resultData.players.map((player, idx) => (
                 <div key={player.id} className="rounded-xl border border-gray-100 bg-white/90 p-4">
-                  <p className="text-xs font-semibold text-base-mute">第 {idx + 1} 位视角</p>
+                  <p className="text-xs font-semibold text-base-mute">{t('result.perspective_player_n', { n: idx + 1 })}</p>
                   <div className="mt-1 flex items-end justify-between gap-3">
                     <div>
                       <p className="text-lg font-bold text-base-text">{player.code}</p>
                       <p className="text-xs text-base-mute">{player.result?.title}</p>
                     </div>
-                    <p className="result-prose-muted">这是 Ta 主观看到的关系版本</p>
+                    <p className="result-prose-muted">{t('result.perspective_subjective')}</p>
                   </div>
                 </div>
               ))}
@@ -451,7 +476,7 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
         <Divider />
 
         {/* ── ③/⑤ 关系优势 ────────────────────────────── */}
-        <SectionHeader num={isDualMode ? '⑤' : '③'} title="关系优势" />
+        <SectionHeader num={isDualMode ? '⑤' : '③'} title={t('result.section_strengths')} />
 
         <div className="result-list">
           {result.strengths.map(({ title, desc }, i) => (
@@ -474,7 +499,7 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
         <Divider />
 
         {/* ── ④/⑥ 关系挑战 ────────────────────────────── */}
-        <SectionHeader num={isDualMode ? '⑥' : '④'} title="关系挑战" />
+        <SectionHeader num={isDualMode ? '⑥' : '④'} title={t('result.section_challenges')} />
 
         <div className="result-list">
           {result.challenges.map(({ title, desc }, i) => (
@@ -497,7 +522,7 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
         <Divider />
 
         {/* ── ⑤/⑦ 冲突模式 ────────────────────────────── */}
-        <SectionHeader num={isDualMode ? '⑦' : '⑤'} title="冲突模式" />
+        <SectionHeader num={isDualMode ? '⑦' : '⑤'} title={t('result.section_conflict')} />
 
         <div className="result-list">
           {/* 触发模式 */}
@@ -508,7 +533,7 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
             <div className="flex items-center gap-2 mb-3">
               <MessageCircleHeart size={14} style={{ color: 'var(--poster-accent)' }} />
               <span className="text-[11px] font-semibold text-base-mute uppercase tracking-wider">
-                典型触发模式
+                {t('result.conflict_pattern_label')}
               </span>
             </div>
             <p className="result-prose">
@@ -521,7 +546,7 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
             <div className="flex items-center gap-2 mb-3">
               <CheckCircle2 size={14} className="text-green-500" />
               <span className="text-[11px] font-semibold text-green-600 uppercase tracking-wider">
-                惯用和解方式
+                {t('result.conflict_resolution_label')}
               </span>
             </div>
             <p className="result-prose">
@@ -533,14 +558,14 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
         <Divider />
 
         {/* ── ⑥/⑧ 充电 vs 耗电 ──────────────────────── */}
-        <SectionHeader num={isDualMode ? '⑧' : '⑥'} title="充电 vs 耗电" />
+        <SectionHeader num={isDualMode ? '⑧' : '⑥'} title={t('result.section_energy')} />
 
         <div className="space-y-4">
           {/* 充电 */}
           <div>
             <div className="flex items-center gap-2 mb-3">
               <Zap size={15} style={{ color: 'var(--poster-accent)' }} />
-              <span className="text-xs font-semibold text-base-text">让感情充电的事</span>
+              <span className="text-xs font-semibold text-base-text">{t('result.energy_charging')}</span>
             </div>
             <div className="space-y-2">
               {result.energyMap.charging.map((item, i) => (
@@ -565,7 +590,7 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
           <div>
             <div className="flex items-center gap-2 mb-3">
               <BatteryLow size={15} className="text-base-mute" />
-              <span className="text-xs font-semibold text-base-text">让感情耗电的事</span>
+              <span className="text-xs font-semibold text-base-text">{t('result.energy_draining')}</span>
             </div>
             <div className="space-y-2">
               {result.energyMap.draining.map((item, i) => (
@@ -586,7 +611,7 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
         <Divider />
 
         {/* ── ⑦/⑨ 长期走向 ───────────────────────────── */}
-        <SectionHeader num={isDualMode ? '⑨' : '⑦'} title="长期走向" />
+        <SectionHeader num={isDualMode ? '⑨' : '⑦'} title={t('result.section_longterm')} />
 
         <div
           className="rounded-xl p-4"
@@ -594,7 +619,7 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
         >
           <div className="flex items-center gap-2 mb-3">
             <Compass size={15} style={{ color: 'var(--poster-accent)' }} />
-            <span className="text-xs font-semibold text-base-mute">这段关系未来的样子</span>
+            <span className="text-xs font-semibold text-base-mute">{t('result.longterm_subhead')}</span>
           </div>
           <p className="result-prose">{result.longterm}</p>
         </div>
@@ -602,7 +627,7 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
         <Divider />
 
         {/* ── ⑧/⑩ 相处 Tips ──────────────────────────── */}
-        <SectionHeader num={isDualMode ? '⑩' : '⑧'} title="相处 Tips" />
+        <SectionHeader num={isDualMode ? '⑩' : '⑧'} title={t('result.section_tips')} />
 
         <div className="result-list">
           {result.tipsForCouple.map((tip, i) => (
@@ -621,7 +646,7 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
         <Divider />
 
         {/* ── 趣味数据 ──────────────────────────────── */}
-        <SectionHeader num="📊" title={isDualMode ? '双人数据报告' : '感知数据报告'} />
+        <SectionHeader num="📊" title={isDualMode ? t('result.section_data_dual') : t('result.section_data_single')} />
 
         <div className="grid grid-cols-2 gap-2">
           {result.funFacts.map(({ label, value }) => (
@@ -644,18 +669,18 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
         <Divider />
 
         {/* ── 关系星盘 ──────────────────────────────── */}
-        <SectionHeader num="✨" title="关系星盘" />
+        <SectionHeader num="✨" title={t('result.section_star')} />
 
         <div className="flex gap-2 sm:gap-3">
           <div className="flex-1 min-w-0 rounded-xl p-2.5 sm:p-3 border border-green-100 bg-green-50/50">
-            <p className="text-[10px] text-green-600 font-semibold mb-1">天选 CP</p>
+            <p className="text-[10px] text-green-600 font-semibold mb-1">{t('result.star_soulmate')}</p>
             <p className="text-xs sm:text-sm font-bold text-base-text leading-snug break-words">
               {soulmateResult?.title ?? result.soulmate}
             </p>
             <p className="text-[10px] text-base-mute mt-0.5">{result.soulmate}</p>
           </div>
           <div className="flex-1 min-w-0 rounded-xl p-2.5 sm:p-3 border border-red-100 bg-red-50/50">
-            <p className="text-[10px] text-red-500 font-semibold mb-1">致命克星</p>
+            <p className="text-[10px] text-red-500 font-semibold mb-1">{t('result.star_nemesis')}</p>
             <p className="text-xs sm:text-sm font-bold text-base-text leading-snug break-words">
               {nemesisResult?.title ?? result.nemesis}
             </p>
@@ -666,7 +691,7 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
         {/* 底部水印 */}
         <div className="pt-8 text-center">
           <p className="text-[10px] text-base-mute/50 tracking-wide break-words">
-            CPTI 亲密光谱测试 · 在16种爱情的颜色里，找到属于你们的那一抹光
+            {t('result.watermark')}
           </p>
         </div>
 
@@ -686,12 +711,10 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
       <div className="space-y-3">
         <div>
           <p className="text-sm font-semibold text-base-text">
-            {isDualMode ? '填入昵称，让合成报告更专属' : '填入昵称，让感知报告更专属'}
+            {isDualMode ? t('result.nickname_dual_title') : t('result.nickname_single_title')}
           </p>
           <p className="text-xs text-base-mute mt-0.5">
-            {isDualMode
-              ? '填完后报告抬头自动更新，也可直接跳过'
-              : '单人模式下，你会看到“我眼中的我们”，之后也可以再邀请 TA 一起拼图'}
+            {isDualMode ? t('result.nickname_dual_desc') : t('result.nickname_single_desc')}
           </p>
         </div>
 
@@ -699,7 +722,7 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
           <input
             type="text"
             maxLength={10}
-            placeholder="TA 的名字"
+            placeholder={t('result.nickname_placeholder_other')}
             value={nickname1}
             onChange={e => setNickname1(e.target.value)}
             className="w-full border border-gray-200 rounded-btn px-3 py-2.5 text-sm text-base-text placeholder:text-gray-300 focus:outline-none focus:border-brand-cyan transition-colors bg-white"
@@ -707,7 +730,7 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
           <input
             type="text"
             maxLength={10}
-            placeholder="你的名字"
+            placeholder={t('result.nickname_placeholder_self')}
             value={nickname2}
             onChange={e => setNickname2(e.target.value)}
             className="w-full border border-gray-200 rounded-btn px-3 py-2.5 text-sm text-base-text placeholder:text-gray-300 focus:outline-none focus:border-brand-cyan transition-colors bg-white"
@@ -726,7 +749,7 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
             onClick={handleGenerate}
             disabled={!canGenerateSinglePoster}
           >
-            生成我的感知报告
+            {t('result.generate_single_btn')}
           </button>
         )}
 
@@ -735,7 +758,7 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
             className="btn-primary w-full py-3 text-sm"
             onClick={handleGenerate}
           >
-            跳过，直接生成双人报告 ↑
+            {t('result.generate_dual_btn')}
           </button>
         )}
       </div>
@@ -745,9 +768,9 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
         <>
           <div className="my-8 h-px bg-gray-200" />
           <div className="rounded-card border border-brand-purple/15 bg-brand-purple/5 p-4">
-            <p className="text-sm font-semibold text-base-text">下一步建议：邀请 TA 一起拼图</p>
+            <p className="text-sm font-semibold text-base-text">{t('result.invite_section_title')}</p>
             <p className="mt-1 text-xs leading-relaxed text-base-mute">
-              你现在拿到的是你视角下的关系画像。真正的 Couple Type 需要双方分别作答后再合成，才能看到你们最一致和最错位的地方。
+              {t('result.invite_section_desc')}
             </p>
             <div className="mt-4 flex flex-col gap-2 sm:flex-row">
               <button
@@ -760,7 +783,7 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
                 ].join(' ')}
                 onClick={handleCopySingleShareLink}
               >
-                {shareCopied ? '单人链接已复制' : '复制单人结果链接'}
+                {shareCopied ? t('result.invite_copy_single_done') : t('result.invite_copy_single')}
               </button>
               <button
                 type="button"
@@ -774,10 +797,10 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
                 disabled={singleInviteLoading}
               >
                 {singleInviteLoading
-                  ? '正在生成双人链接...'
+                  ? t('result.invite_copy_dual_loading')
                   : inviteCopied
-                    ? '双人链接已复制'
-                    : '复制双人拼图链接'}
+                    ? t('result.invite_copy_dual_done')
+                    : t('result.invite_copy_dual')}
               </button>
               {singleInviteLink && (
                 <a
@@ -786,7 +809,7 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
                   target="_blank"
                   rel="noreferrer"
                 >
-                  预览邀请链接
+                  {t('result.invite_preview_link')}
                 </a>
               )}
             </div>
@@ -795,9 +818,9 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
             )}
             <p className="mt-2 text-xs text-green-600 min-h-[1.25rem]">
               {inviteCopied
-                ? '双人链接已复制，可直接发给 TA'
+                ? t('result.invite_copy_dual_done_tip')
                 : shareCopied
-                  ? '单人结果链接可反复打开/分享'
+                  ? t('result.invite_copy_single_done_tip')
                   : ' '}
             </p>
           </div>
@@ -817,14 +840,14 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
                 </span>
                 <div>
                   <div className="mb-1 flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-bold text-base-text">想继续聊聊这份报告？</p>
+                    <p className="text-sm font-bold text-base-text">{t('result.ai_card_title')}</p>
                     <span className="inline-flex items-center gap-1 rounded-full bg-brand-cyan/10 px-2 py-1 text-[10px] font-semibold text-brand-cyan">
                       <Sparkles size={12} aria-hidden />
-                      基于 {result.code}
+                      {t('result.ai_card_based', { code: result.code })}
                     </span>
                   </div>
                   <p className="text-xs leading-6 text-base-mute">
-                    AI 关系助手已为你准备好独立聊天页，会带着当前类型、四维光谱和冲突模式继续回答具体问题。
+                    {t('result.ai_card_desc')}
                   </p>
                 </div>
               </div>
@@ -833,7 +856,7 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
                 onClick={onOpenAi}
                 className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-brand-cyan px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:opacity-90"
               >
-                进入 AI 聊天页
+                {t('result.ai_card_btn')}
                 <ArrowRight size={16} aria-hidden />
               </button>
             </div>
@@ -843,16 +866,16 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
 
       <div className="mt-5 text-center space-y-1">
         <p className="text-sm text-base-mute">
-          {isDualMode ? '长按上方图片保存双人结果' : '长按上方图片保存你的感知结果'}
+          {isDualMode ? t('result.poster_share_dual_save') : t('result.poster_share_single_save')}
         </p>
         <p className="text-sm text-base-mute">
-          {isDualMode ? '点击右上角分享给好友 / 朋友圈' : '也可以把这份结果发给 TA，邀请一起完成双人拼图'}
+          {isDualMode ? t('result.poster_share_dual_share') : t('result.poster_share_single_share')}
         </p>
       </div>
 
       <div className="mt-5 text-center">
         <button className="btn-ghost px-8 py-2" onClick={onRestart}>
-          重新测试
+          {t('common.restart')}
         </button>
       </div>
     </div>

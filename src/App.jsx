@@ -15,6 +15,7 @@ import { preloadTypeImage } from './data/typeImages'
 import { clearQuizDraft } from './utils/quizDraft'
 import { readSingleShareFromSearch, stripSingleShareFromUrl } from './utils/inviteCodec'
 import { readStoredResult, saveStoredResult } from './utils/resultPersistence'
+import { useLanguage } from './i18n/LanguageContext'
 
 const ResultPoster = lazy(() => import('./components/ResultPoster'))
 const CoupleTypesPage = lazy(() => import('./components/types/CoupleTypesPage'))
@@ -60,6 +61,7 @@ function replaceLocationHash(hash = '') {
  *   'help'  — 常见问题 + 关于 CPTI
  */
 export default function App() {
+  const { t } = useLanguage()
   const [view, setView] = useState(() => shouldOpenAiFromHash() ? 'ai' : 'home')
   const [mainTab, setMainTab] = useState(getInitialMainTab)
   const [resultData, setResultData] = useState(getInitialStoredResult)
@@ -256,7 +258,7 @@ export default function App() {
             exit={{    opacity: 0, y: -16 }}
             transition={{ duration: 0.4 }}
           >
-            <Suspense fallback={<div className="py-16 text-center text-base-mute">正在准备报告内容...</div>}>
+            <Suspense fallback={<div className="py-16 text-center text-base-mute">{t('result.suspense_loading')}</div>}>
               <ResultPoster
                 resultData={resultData}
                 onRestart={handleRestart}
@@ -305,7 +307,7 @@ export default function App() {
       contentSurface={mainTab === 'types' ? 'white' : 'muted'}
     >
       {mainTab === 'types' ? (
-        <Suspense fallback={<div className="py-12 text-center text-base-mute">正在加载情侣类型...</div>}>
+        <Suspense fallback={<div className="py-12 text-center text-base-mute">{t('result.suspense_loading')}</div>}>
           <CoupleTypesPage onStartTest={goQuizHome} />
         </Suspense>
       ) : mainTab === 'stats' ? (
@@ -319,9 +321,11 @@ export default function App() {
         <HelpPage onStartTest={goQuizHome} />
       ) : (
         <>
-          <div className="pt-4 pb-5 text-center md:pt-10 md:pb-7">
-            <p className="text-eyebrow mb-2">Intimacy Spectrum Test · CPTI</p>
-            <h1 className="text-2xl md:text-[34px] font-extrabold leading-tight mb-3 text-base-text">
+          {/* 紧凑首屏：上下 padding 压缩，让 hero + 三步 + 主 CTA 在常见视口一屏可见。
+              选了模式后用户已经进入滚动答题节奏，紧凑感不会有负面影响。 */}
+          <div className="pt-4 pb-4 text-center md:pt-8 md:pb-6">
+            <p className="text-eyebrow mb-2.5">{t('home.eyebrow')}</p>
+            <h1 className="text-[26px] md:text-[36px] font-extrabold leading-tight mb-3 text-base-text">
               <span className="cpti-word font-display" aria-label="CPTI">
                 <span className="cpti-gradient-bg" aria-hidden>
                   {['C', 'P', 'T', 'I'].map((char) => (
@@ -338,16 +342,16 @@ export default function App() {
                   </span>
                 ))}
               </span>
-              <span> 亲密光谱测试</span>
+              <span>{t('home.title_suffix')}</span>
             </h1>
-            <p className="text-mute mx-auto max-w-xl">
-              一个人先看你眼中的我们，两个人拼出真正的我们。
+            <p className="text-mute mx-auto max-w-xl text-sm md:text-[15px]">
+              {t('home.subtitle')}
             </p>
           </div>
 
           <HomeStepCards />
 
-          <div className="my-6 border-t border-gray-100" />
+          <div className="my-4 border-t border-gray-100 md:my-5" />
 
           <Questionnaire onComplete={handleQuizComplete} />
         </>

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import LikertScale from './LikertScale'
-import { QUESTION_MODE_COPY, QUESTIONS, QUESTIONS_PER_DIMENSION, getQuestionPrompt } from '../data/questions'
+import { QUESTIONS, QUESTIONS_PER_DIMENSION, getQuestionPrompt } from '../data/questions'
 import {
   createDualInviteLink,
   createSingleShareLink,
@@ -11,6 +11,8 @@ import {
 import { consumeDualInvite, createDualInvite, probeDualInvite } from '../utils/statsApi'
 import { clearQuizDraft, readQuizDraft, saveQuizDraft } from '../utils/quizDraft'
 import { computeSingleModeResult, DIMENSION_DETAILS } from '../utils/scoring'
+import { useLanguage } from '../i18n/LanguageContext'
+import { useLocalizedQuestions } from '../i18n/useLocalizedData'
 
 const INITIAL_COUNT = 6
 const LOAD_STEP     = 6          // 每次多加载 6 题，减少触发次数
@@ -18,13 +20,13 @@ const ANSWER_COOLDOWN_MS = 1200  // 两次作答之间最短间隔（ms）
 const DRAFT_SAVE_DEBOUNCE_MS = 250
 const RESTART_CONFIRM_THRESHOLD = 5
 
-const INVITE_ERROR_COPY = {
-  'legacy-link-unsupported': '这份邀请链接来自旧版本，暂时无法继续，请让对方重新发起双人拼图。',
-  'invalid-token': '这份邀请链接无法识别，请让对方重新复制完整链接。',
-  'invite-invalid': '这份邀请链接无效或不存在，请让对方重新发起双人拼图。',
-  'invite-used': '这份邀请链接已被使用，不能重复参与，请让对方重新发起双人拼图。',
-  'invite-expired': '这份邀请链接已过期（有效期24小时），请让对方重新发起双人拼图。',
-  'question-count-mismatch': '这份邀请链接和当前题库不匹配，请让对方重新发起一次双人拼图。',
+const INVITE_ERROR_KEYS = {
+  'legacy-link-unsupported': 'quiz.invite_legacy',
+  'invalid-token': 'quiz.invite_invalid_token',
+  'invite-invalid': 'quiz.invite_invalid',
+  'invite-used': 'quiz.invite_used',
+  'invite-expired': 'quiz.invite_expired',
+  'question-count-mismatch': 'quiz.invite_question_mismatch',
 }
 
 function getAnsweredCount(answers) {
@@ -49,10 +51,22 @@ function getRevealCountByAnswers(answers, total) {
 
 const DIMENSION_ROWS = Object.values(DIMENSION_DETAILS)
 
-function renderPreviewSpectrum(percentages) {
+function getLocalizedDimRow(t, row) {
+  const key = `${row.posKey}${row.negKey}` // SI / RP / OF / DA
+  return {
+    posKey: row.posKey,
+    negKey: row.negKey,
+    title: t(`dim.${key}.title`, { fallback: row.title }),
+    posLabel: t(`dim.${key}.posLabel`, { fallback: row.posLabel }),
+    negLabel: t(`dim.${key}.negLabel`, { fallback: row.negLabel }),
+  }
+}
+
+function renderPreviewSpectrum(percentages, t) {
   return (
     <div className="space-y-3">
-      {DIMENSION_ROWS.map(({ posKey, negKey, posLabel, negLabel, title }) => {
+      {DIMENSION_ROWS.map((row) => {
+        const { posKey, negKey, posLabel, negLabel, title } = getLocalizedDimRow(t, row)
         const posVal = percentages?.[posKey] ?? 50
         const negVal = percentages?.[negKey] ?? 50
         return (
@@ -95,6 +109,30 @@ function renderPreviewSpectrum(percentages) {
  *   onComplete(answers: { [qId]: selectedIndex }) — 答完后回调给 App
  */
 export default function Questionnaire({ onComplete }) {
+  const { t } = useLanguage()
+  const localizedQuestions = useLocalizedQuestions()
+  const QUESTION_MODE_COPY_LOCALIZED = {
+    single: {
+      badge: t('quiz.single_badge'),
+      title: t('quiz.single_title'),
+      description: t('quiz.single_desc'),
+      hint: t('quiz.single_hint'),
+      cta: t('quiz.single_cta'),
+      progressLabel: t('quiz.single_progress_label'),
+    },
+    dual: {
+      badge: t('quiz.dual_badge'),
+      title: t('quiz.dual_title'),
+      description: t('quiz.dual_desc'),
+      hint: t('quiz.dual_hint'),
+      cta: t('quiz.dual_cta'),
+      progressLabel: t('quiz.dual_progress_label'),
+    },
+  }
+  function inviteErrorMsg(reason) {
+    const key = INVITE_ERROR_KEYS[reason]
+    return key ? t(key) : t('quiz.invite_unavailable')
+  }
   const initialInviteStatus = typeof window !== 'undefined'
     ? readDualInviteFromSearch(window.location.search).status
     : 'idle'
@@ -134,7 +172,7 @@ export default function Questionnaire({ onComplete }) {
   const total         = QUESTIONS.length
   const answeredCount = Object.keys(answers).length
   const modeChosen = selectedMode !== null
-  const currentModeCopy = selectedMode ? QUESTION_MODE_COPY[selectedMode] : null
+  const currentModeCopy = selectedMode ? QUESTION_MODE_COPY_LOCALIZED[selectedMode] : null
   const progress = modeChosen ? (answeredCount / total) * 100 : 0
 
   // 同步 ref
@@ -311,7 +349,7 @@ export default function Questionnaire({ onComplete }) {
             expired: 'invite-expired',
             invalid: 'invite-invalid',
           }
-          const message = INVITE_ERROR_COPY[statusToReason[data.status]] || '这份邀请链接暂时不可用，请让对方重新发起。'
+          const message = inviteErrorMsg(statusToReason[data.status])
           resetToEntry()
           setInviteError(message)
           setInviteErrorModalOpen(true)
@@ -320,7 +358,7 @@ export default function Questionnaire({ onComplete }) {
         .catch((error) => {
           setInviteGate({ checking: false })
           const reason = error?.code || 'invite-invalid'
-          const message = INVITE_ERROR_COPY[reason] || '这份邀请链接暂时不可用，请让对方重新发起。'
+          const message = inviteErrorMsg(reason)
           resetToEntry()
           setInviteError(message)
           setInviteErrorModalOpen(true)
@@ -332,8 +370,7 @@ export default function Questionnaire({ onComplete }) {
     }
 
     if (parsed.status === 'invalid') {
-      const fallbackMessage = '这份邀请链接无法识别，请让对方重新生成一份新的双人拼图链接。'
-      const message = INVITE_ERROR_COPY[parsed.reason] ?? fallbackMessage
+      const message = INVITE_ERROR_KEYS[parsed.reason] ? t(INVITE_ERROR_KEYS[parsed.reason]) : t('quiz.invite_unrecognized')
       setInviteError(message)
       setInviteErrorModalOpen(true)
       window.history.replaceState({}, '', stripDualInviteFromUrl())
@@ -434,8 +471,8 @@ export default function Questionnaire({ onComplete }) {
     if (!navigator.share) return
     try {
       await navigator.share({
-        title: 'CPTI 双人拼图邀请',
-        text: '我刚完成了第一位作答，点开链接一起拼出我们的 Couple Type～',
+        title: t('quiz.invite_share_title'),
+        text: t('quiz.invite_share_text'),
         url: inviteLink,
       })
     } catch {
@@ -535,11 +572,11 @@ export default function Questionnaire({ onComplete }) {
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(inviteLink)
       } else {
-        window.prompt('复制下面的双人拼图链接', inviteLink)
+        window.prompt(t('quiz.invite_clipboard_prompt'), inviteLink)
       }
       setInviteCopied(true)
     } catch {
-      window.prompt('复制下面的双人拼图链接', inviteLink)
+      window.prompt(t('quiz.invite_clipboard_prompt'), inviteLink)
       setInviteCopied(true)
     }
   }
@@ -548,7 +585,7 @@ export default function Questionnaire({ onComplete }) {
     const missingIdx = QUESTIONS.findIndex((question) => !(question.id in nextAnswers))
     if (missingIdx === -1) return false
 
-    setCompletionError('还有题目没作答，先回到第一道漏答题完成后再继续。')
+    setCompletionError(t('quiz.completion_error_unfinished'))
     setFocusedIdx(missingIdx)
     scrollLockRef.current = missingIdx
     setTimeout(() => {
@@ -590,7 +627,7 @@ export default function Questionnaire({ onComplete }) {
             window.scrollTo({ top: 0, behavior: 'instant' })
           })
           .catch((error) => {
-            const message = error?.message || '邀请链接生成失败，请稍后重试。'
+            const message = error?.message || t('quiz.invite_failed')
             setCompletionError(message)
             setInviteCreateStatus({ loading: false, error: message })
           })
@@ -598,14 +635,14 @@ export default function Questionnaire({ onComplete }) {
       }
 
       if (!inviteToken) {
-        setCompletionError('邀请链接状态异常，请让第一位重新发起双人拼图。')
+        setCompletionError(t('quiz.invite_state_anomaly'))
         return true
       }
 
       consumeDualInvite(inviteToken)
         .then((consumed) => {
           if (consumed.questionCount !== QUESTIONS.length) {
-            setCompletionError(INVITE_ERROR_COPY['question-count-mismatch'])
+            setCompletionError(t('quiz.invite_question_mismatch'))
             return
           }
           const mergedSets = [consumed.answersA || {}, nextAnswers]
@@ -614,7 +651,7 @@ export default function Questionnaire({ onComplete }) {
         })
         .catch((error) => {
           const reason = error?.code || 'invite-invalid'
-          const message = INVITE_ERROR_COPY[reason] || '邀请链接已不可用，请让对方重新发起双人拼图。'
+          const message = INVITE_ERROR_KEYS[reason] ? t(INVITE_ERROR_KEYS[reason]) : t('quiz.invite_revoked')
           setCompletionError(message)
           setInviteError(message)
           setSelectedMode(null)
@@ -677,9 +714,9 @@ export default function Questionnaire({ onComplete }) {
       {resumeDraft && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/35 backdrop-blur-[1px] px-4">
           <div className="w-full max-w-md rounded-card border border-gray-100 bg-white p-5 shadow-xl">
-            <p className="text-base font-semibold text-base-text">检测到上次未完成作答</p>
+            <p className="text-base font-semibold text-base-text">{t('quiz.resume_title')}</p>
             <p className="mt-2 text-sm leading-relaxed text-base-mute">
-              你上次已完成 {resumeDraft.answeredCount} / {total} 题。可以继续上次进度，也可以重新开始。
+              {t('quiz.resume_desc', { answered: resumeDraft.answeredCount, total })}
             </p>
             <div className="mt-5 flex flex-col gap-2 sm:flex-row">
               <button
@@ -687,14 +724,14 @@ export default function Questionnaire({ onComplete }) {
                 className="btn-primary flex-1 py-2.5 text-sm"
                 onClick={handleResumeContinue}
               >
-                继续上次作答
+                {t('quiz.resume_continue')}
               </button>
               <button
                 type="button"
                 className="btn-ghost flex-1 py-2.5 text-sm"
                 onClick={handleResumeRestart}
               >
-                重新开始
+                {t('quiz.resume_restart')}
               </button>
             </div>
           </div>
@@ -704,9 +741,9 @@ export default function Questionnaire({ onComplete }) {
       {confirmDialog.open && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-sm rounded-card border border-rose-100 bg-white p-5 shadow-xl">
-            <p className="text-base font-semibold text-base-text">确认重新开始？</p>
+            <p className="text-base font-semibold text-base-text">{t('quiz.confirm_restart_title')}</p>
             <p className="mt-2 text-sm leading-relaxed text-base-mute">
-              你当前已作答 {confirmDialog.count} 题，重新开始会清空已保存的作答记录。
+              {t('quiz.confirm_restart_desc', { count: confirmDialog.count })}
             </p>
             <div className="mt-5 flex gap-2">
               <button
@@ -714,14 +751,14 @@ export default function Questionnaire({ onComplete }) {
                 className="btn-ghost flex-1 py-2.5 text-sm"
                 onClick={closeRestartConfirm}
               >
-                取消
+                {t('common.cancel')}
               </button>
               <button
                 type="button"
                 className="flex-1 rounded-btn bg-rose-500 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-600"
                 onClick={handleConfirmRestart}
               >
-                确认重开
+                {t('quiz.confirm_restart_ok')}
               </button>
             </div>
           </div>
@@ -731,9 +768,9 @@ export default function Questionnaire({ onComplete }) {
       {inviteGate.checking && (
         <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/20 px-4">
           <div className="w-full max-w-sm rounded-card border border-gray-100 bg-white p-5 shadow-xl">
-            <p className="text-base font-semibold text-base-text">正在校验邀请链接…</p>
+            <p className="text-base font-semibold text-base-text">{t('quiz.invite_checking_title')}</p>
             <p className="mt-2 text-sm leading-relaxed text-base-mute">
-              请稍等片刻，我们在确认这条双人链接是否仍然有效。
+              {t('quiz.invite_checking_desc')}
             </p>
           </div>
         </div>
@@ -742,7 +779,7 @@ export default function Questionnaire({ onComplete }) {
       {inviteErrorModalOpen && inviteError && (
         <div className="fixed inset-0 z-[85] flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-sm rounded-card border border-amber-200 bg-white p-5 shadow-xl">
-            <p className="text-base font-semibold text-base-text">邀请链接不可用</p>
+            <p className="text-base font-semibold text-base-text">{t('quiz.invite_error_modal_title')}</p>
             <p className="mt-2 text-sm leading-relaxed text-base-mute">{inviteError}</p>
             <div className="mt-5">
               <button
@@ -750,7 +787,7 @@ export default function Questionnaire({ onComplete }) {
                 className="btn-primary w-full py-2.5 text-sm"
                 onClick={closeInviteErrorModal}
               >
-                我知道了
+                {t('quiz.invite_error_modal_ok')}
               </button>
             </div>
           </div>
@@ -758,7 +795,7 @@ export default function Questionnaire({ onComplete }) {
       )}
 
       {/* ── 始终可见的 sticky 进度条（四色光谱 + 末端柔光高光） ── */}
-      <div className="sticky top-16 sm:top-[4.5rem] lg:top-20 z-40 bg-base-bg/95 backdrop-blur-[2px] pt-3 pb-1 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10">
+      <div className="sticky top-16 sm:top-[4.5rem] lg:top-20 z-40 bg-base-bg/95 backdrop-blur-[2px] pt-2 pb-1 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10">
         <div className="spectrum-track">
           <motion.div
             className="spectrum-fill"
@@ -789,7 +826,7 @@ export default function Questionnaire({ onComplete }) {
                 transition={{ duration: 0.2 }}
                 className="text-[11px] font-semibold text-amber-600 leading-none bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5"
               >
-                慢一点～每题都值得认真感受 🌿
+                {t('quiz.cooldown_msg')}
               </motion.span>
             )}
           </AnimatePresence>
@@ -809,12 +846,12 @@ export default function Questionnaire({ onComplete }) {
           </AnimatePresence>
           <p className="text-[10px] text-base-mute ml-auto">
             {modeChosen
-              ? `${currentModeCopy?.progressLabel ?? '当前进度'} · ${selectedMode === 'dual'
+              ? `${currentModeCopy?.progressLabel ?? t('quiz.progress_default_label')} · ${selectedMode === 'dual'
                 ? inviteLink
-                  ? '邀请阶段'
-                  : `第 ${activePlayerIdx + 1} 位`
-                : '单人'} · ${answeredCount} / ${total}`
-              : '选择方式后开始'}
+                  ? t('quiz.progress_invite_phase')
+                  : t('quiz.progress_player_n', { n: activePlayerIdx + 1 })
+                : t('quiz.progress_single_mode')} · ${answeredCount} / ${total}`
+              : t('quiz.progress_choose_mode')}
           </p>
         </div>
       </div>
@@ -825,62 +862,64 @@ export default function Questionnaire({ onComplete }) {
             ref={q0Ref}
             animate={{ opacity: isQ0Active || !modeChosen ? 1 : 0.35 }}
             transition={{ duration: 0.25 }}
-            className="border-b border-gray-100 py-8"
+            className="border-b border-gray-100 py-2 md:py-3"
           >
             <p className={[
-              'leading-relaxed mb-7 max-w-xl mx-auto text-center transition-all duration-200',
+              'leading-snug mb-3 md:mb-4 max-w-xl mx-auto text-center transition-all duration-200',
               isQ0Active || !modeChosen
                 ? 'text-base sm:text-lg font-semibold text-base-text'
                 : 'text-sm sm:text-base font-normal text-base-mute',
             ].join(' ')}>
-              你们想以什么方式开始这次测试？
+              {t('quiz.mode_question')}
             </p>
 
             {inviteError && (
-              <div className="max-w-xl mx-auto mb-5 rounded-card border border-amber-200 bg-amber-50 px-4 py-3 text-left">
-                <p className="text-sm font-semibold text-amber-700">邀请链接已失效</p>
+              <div className="max-w-xl mx-auto mb-4 rounded-card border border-amber-200 bg-amber-50 px-4 py-3 text-left">
+                <p className="text-sm font-semibold text-amber-700">{t('quiz.invite_expired_banner_title')}</p>
                 <p className="mt-1 text-xs leading-relaxed text-amber-700/90">{inviteError}</p>
               </div>
             )}
 
-            <div className="max-w-xl mx-auto flex flex-col gap-3">
+            <div className="max-w-xl mx-auto flex flex-col gap-2.5">
               <button
                 className={[
-                  'w-full py-3.5 rounded-btn border-2 font-semibold text-sm transition-all duration-150 active:scale-[0.98]',
+                  'w-full py-3 rounded-btn border-2 font-semibold text-sm transition-all duration-150 active:scale-[0.98]',
                   selectedMode === 'single'
                     ? 'border-brand-cyan bg-brand-cyan text-white'
                     : 'border-brand-cyan text-brand-cyan hover:bg-brand-cyan hover:text-white',
                 ].join(' ')}
                 onClick={() => requestModeChange('single')}
               >
-                单人速通：先看我眼中的我们
+                {t('quiz.mode_single_btn')}
               </button>
               <button
                 className={[
-                  'w-full py-3.5 rounded-btn border-2 font-semibold text-sm transition-all duration-150 active:scale-[0.98]',
+                  'w-full py-3 rounded-btn border-2 font-semibold text-sm transition-all duration-150 active:scale-[0.98]',
                   selectedMode === 'dual'
                     ? 'border-brand-purple bg-brand-purple text-white'
                     : 'border-gray-200 text-base-mute hover:border-brand-purple hover:text-brand-purple',
                 ].join(' ')}
                 onClick={() => requestModeChange('dual')}
               >
-                双人拼图：解锁真正的情侣合成结果
+                {t('quiz.mode_dual_btn')}
               </button>
             </div>
 
             {!modeChosen && (
-              <div className="max-w-xl mx-auto mt-6 grid gap-x-6 gap-y-4 text-left sm:grid-cols-2">
+              // 移动端隐藏：移动端屏幕小，hero + 三步 + 两个 CTA 已经讲清楚单/双差异；
+              // 桌面端 sm 及以上才显示这组双列说明，作为更详尽的补充。
+              <div className="hidden sm:grid max-w-xl mx-auto mt-2.5 md:mt-3 gap-x-6 gap-y-2 text-left sm:grid-cols-2">
                 <div className="relative pl-3 sm:pl-4">
                   <span className="absolute left-0 top-1 h-[calc(100%-0.25rem)] w-[2px] rounded-full bg-brand-cyan/70" aria-hidden />
-                  <p className="text-eyebrow mb-1.5">{QUESTION_MODE_COPY.single.badge}</p>
-                  <p className="text-sm font-semibold text-base-text mb-1">{QUESTION_MODE_COPY.single.title}</p>
-                  <p className="text-xs leading-relaxed text-base-mute">{QUESTION_MODE_COPY.single.description}</p>
+                  <p className="text-eyebrow mb-1">{QUESTION_MODE_COPY_LOCALIZED.single.badge}</p>
+                  <p className="text-sm font-semibold text-base-text mb-0.5">{QUESTION_MODE_COPY_LOCALIZED.single.title}</p>
+                  <p className="text-xs leading-snug text-base-mute line-clamp-2">{QUESTION_MODE_COPY_LOCALIZED.single.description}</p>
                 </div>
                 <div className="relative pl-3 sm:pl-4">
                   <span className="absolute left-0 top-1 h-[calc(100%-0.25rem)] w-[2px] rounded-full bg-brand-purple/70" aria-hidden />
-                  <p className="text-eyebrow mb-1.5" style={{ color: '#88619a' }}>{QUESTION_MODE_COPY.dual.badge}</p>
-                  <p className="text-sm font-semibold text-base-text mb-1">{QUESTION_MODE_COPY.dual.title}</p>
-                  <p className="text-xs leading-relaxed text-base-mute">{QUESTION_MODE_COPY.dual.description}</p>
+                  <p className="text-eyebrow mb-1" style={{ color: '#88619a' }}>{QUESTION_MODE_COPY_LOCALIZED.dual.badge}</p>
+                  <p className="text-sm font-semibold text-base-text mb-0.5">{QUESTION_MODE_COPY_LOCALIZED.dual.title}</p>
+                  <p className="text-xs leading-snug text-base-mute line-clamp-2">{QUESTION_MODE_COPY_LOCALIZED.dual.description}</p>
                 </div>
               </div>
             )}
@@ -907,7 +946,7 @@ export default function Questionnaire({ onComplete }) {
                 </div>
                 {selectedMode === 'dual' && (
                   <span className="text-[11px] rounded-full bg-brand-purple/10 px-2.5 py-1 font-semibold text-brand-purple">
-                    当前为第 {activePlayerIdx + 1} 位
+                    {t('quiz.preview_current_player_chip', { n: activePlayerIdx + 1 })}
                   </span>
                 )}
               </div>
@@ -916,7 +955,7 @@ export default function Questionnaire({ onComplete }) {
               {enteredFromInvite && (
                 <p className="mt-2 text-xs leading-relaxed text-base-mute">
                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-brand-purple mr-1.5 align-middle" />
-                  你是通过邀请链接进入的第二位作答者。请按你的真实感受完成答题，系统会在你提交后合成最终 Couple Type。
+                  {t('quiz.invited_player_note')}
                 </p>
               )}
             </div>
@@ -928,37 +967,37 @@ export default function Questionnaire({ onComplete }) {
             <div className="rounded-card border border-brand-purple/20 bg-white p-5 shadow-card">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-semibold tracking-wide text-brand-purple">你的视角预览</p>
+                  <p className="text-[11px] font-semibold tracking-wide text-brand-purple">{t('quiz.preview_eyebrow')}</p>
                   <p className="mt-1 text-base font-semibold text-base-text">
-                    你的视角预览（非最终 Couple Type）
+                    {t('quiz.preview_title')}
                   </p>
                 </div>
                 <span className="shrink-0 rounded-full bg-brand-purple/10 px-2.5 py-1 text-[11px] font-semibold text-brand-purple">
-                  还差一步
+                  {t('quiz.preview_pending_chip')}
                 </span>
               </div>
 
               <p className="mt-2 text-sm leading-relaxed text-base-mute">
-                这是你此刻对关系的主观感知版本。最终合成结果要等 TA 完成后生成：会展示你们的合成类型与一致/错位维度。
+                {t('quiz.preview_desc')}
               </p>
 
               <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50/80 px-4 py-3">
                 <div className="flex items-end justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-2xl font-black tracking-wide text-base-text">{player1Preview.code || '--'}</p>
-                    <p className="text-sm font-semibold text-base-text truncate">{player1Preview.title || '你的感知类型'}</p>
+                    <p className="text-sm font-semibold text-base-text truncate">{player1Preview.title || t('quiz.preview_type_fallback')}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-[11px] font-semibold text-base-mute">预览摘要</p>
+                    <p className="text-[11px] font-semibold text-base-mute">{t('quiz.preview_summary_label')}</p>
                     <p className="mt-1 text-xs leading-relaxed text-base-mute max-w-[14rem]">
-                      {(player1Preview.summary || '').slice(0, 40) || '完成双人拼图后可查看完整双人报告。'}
+                      {(player1Preview.summary || '').slice(0, 40) || t('quiz.preview_summary_placeholder')}
                     </p>
                   </div>
                 </div>
               </div>
 
               <div className="mt-4">
-                {renderPreviewSpectrum(player1Preview.percentages)}
+                {renderPreviewSpectrum(player1Preview.percentages, t)}
               </div>
 
               <div className="mt-5 flex flex-col gap-2 sm:flex-row">
@@ -969,10 +1008,10 @@ export default function Questionnaire({ onComplete }) {
                   disabled={!inviteLink || inviteCreateStatus.loading}
                 >
                   {inviteCreateStatus.loading
-                    ? '正在生成邀请链接...'
+                    ? t('quiz.preview_copy_loading')
                     : inviteCopied
-                      ? '邀请链接已复制'
-                      : '复制邀请链接'}
+                      ? t('quiz.preview_copy_done')
+                      : t('quiz.preview_copy_btn')}
                 </button>
 
                 {typeof navigator !== 'undefined' && typeof navigator.share === 'function' && (
@@ -981,14 +1020,14 @@ export default function Questionnaire({ onComplete }) {
                     className="btn-ghost flex-1 py-3 text-sm"
                     onClick={handleShareInviteLink}
                   >
-                    一键发给 TA
+                    {t('quiz.preview_share_btn')}
                   </button>
                 )}
               </div>
 
               <div className="mt-3 flex items-center justify-between gap-3">
                 <p className="text-xs text-base-mute">
-                  链接一次性 · 24小时有效 · TA 提交后自动生成双人报告
+                  {t('quiz.preview_link_note')}
                 </p>
                 {player1Preview.singleShareLink && (
                   <button
@@ -996,7 +1035,7 @@ export default function Questionnaire({ onComplete }) {
                     className="text-xs font-semibold text-brand-purple underline underline-offset-4"
                     onClick={() => window.open(player1Preview.singleShareLink, '_blank', 'noreferrer')}
                   >
-                    查看完整单人报告（可选）
+                    {t('quiz.preview_open_single')}
                   </button>
                 )}
               </div>
@@ -1014,10 +1053,10 @@ export default function Questionnaire({ onComplete }) {
           <div className="max-w-xl mx-auto py-8 border-b border-gray-100">
             <div className="rounded-card border border-brand-purple/15 bg-brand-purple/5 p-5 space-y-4">
               <div>
-                <p className="text-[11px] font-semibold tracking-wide text-brand-purple">邀请链接已生成</p>
-                <p className="text-lg font-semibold text-base-text mt-1">把这条链接发给 TA，完成真正的双人拼图</p>
+                <p className="text-[11px] font-semibold tracking-wide text-brand-purple">{t('quiz.invite_block_eyebrow')}</p>
+                <p className="text-lg font-semibold text-base-text mt-1">{t('quiz.invite_block_title')}</p>
                 <p className="text-sm leading-relaxed text-base-mute mt-2">
-                  第一位的答案已经被写进邀请链接里。第二位打开链接后会直接进入自己的答题流程，答完后即可生成最终 Couple Type。
+                  {t('quiz.invite_block_desc')}
                 </p>
               </div>
 
@@ -1032,7 +1071,7 @@ export default function Questionnaire({ onComplete }) {
                   target="_blank"
                   rel="noreferrer"
                 >
-                  打开邀请链接
+                  {t('quiz.invite_block_open')}
                 </a>
               </div>
 
@@ -1041,14 +1080,14 @@ export default function Questionnaire({ onComplete }) {
                 className="text-sm text-base-mute underline underline-offset-4"
                 onClick={requestRestartDualFlow}
               >
-                重新开始这次双人拼图
+                {t('quiz.invite_block_restart')}
               </button>
             </div>
           </div>
         )}
 
         {/* ── 正式题目（选完模式后渲染） ── */}
-        {modeChosen && !inviteLink && QUESTIONS.slice(0, revealCount).map((q, idx) => {
+        {modeChosen && !inviteLink && localizedQuestions.slice(0, revealCount).map((q, idx) => {
           const isActive   = focusedIdx === idx
           const isAnswered = q.id in answers
 
@@ -1076,6 +1115,8 @@ export default function Questionnaire({ onComplete }) {
                 <LikertScale
                   value={isAnswered ? answers[q.id] : null}
                   onChange={selIdx => handleAnswer(idx, selIdx)}
+                  leftLabel={t('quiz.likert_left')}
+                  rightLabel={t('quiz.likert_right')}
                 />
               </div>
             </motion.div>

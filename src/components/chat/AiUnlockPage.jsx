@@ -1,12 +1,13 @@
 import { ArrowRight, MessageCircleHeart, Sparkles } from 'lucide-react'
-
-const FEATURES = [
-  ['01', '先有结果', 'AI 会基于 SROD、IPOA 等类型和四维百分比回答，而不是泛泛说教。'],
-  ['02', '只传摘要', '不会上传昵称或完整原始答题，只使用必要的关系结果上下文。'],
-  ['03', '本地记录', '聊天历史仅保存在当前浏览器，刷新页面后仍可继续查看。'],
-]
+import { useLanguage } from '../../i18n/LanguageContext'
 
 export default function AiUnlockPage({ onStartTest }) {
+  const { t } = useLanguage()
+  const FEATURES = [
+    ['01', t('ai.feature1_title'), t('ai.feature1_desc')],
+    ['02', t('ai.feature2_title'), t('ai.feature2_desc')],
+    ['03', t('ai.feature3_title'), t('ai.feature3_desc')],
+  ]
   return (
     <div className="pb-10">
       {/* Hero — 去外层大白卡，改为开放式版式 + radial 光晕 */}
@@ -37,16 +38,15 @@ export default function AiUnlockPage({ onStartTest }) {
 
           <p className="text-eyebrow inline-flex items-center gap-1.5">
             <Sparkles size={12} aria-hidden />
-            AI · Relationship Companion
+            {t('ai.eyebrow')}
           </p>
 
           <h1 className="mt-3 font-extrabold leading-tight text-base-text text-2xl md:text-[34px]">
-            AI 关系助手会带着<br className="md:hidden" /> 你们的 CPTI 结果一起聊
+            {t('ai.title')}
           </h1>
 
           <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-base-mute">
-            完成测试后，AI 会读取你的类型、四维光谱、关系优势与冲突模式，
-            再针对具体情感问题给出更贴合的沟通建议。在解锁前，它不会进行空泛聊天。
+            {t('ai.desc')}
           </p>
 
           <button
@@ -54,7 +54,7 @@ export default function AiUnlockPage({ onStartTest }) {
             onClick={onStartTest}
             className="mt-7 inline-flex items-center justify-center gap-2 rounded-full bg-brand-cyan px-7 py-3 text-sm font-semibold text-white shadow-[0_12px_30px_-12px_rgba(66,152,180,0.7)] transition-all duration-200 hover:opacity-95 hover:-translate-y-0.5 active:scale-[0.98]"
           >
-            先完成 CPTI 测试
+            {t('ai.cta')}
             <ArrowRight className="h-4 w-4 shrink-0" strokeWidth={2.5} aria-hidden />
           </button>
         </div>
@@ -62,7 +62,7 @@ export default function AiUnlockPage({ onStartTest }) {
 
       {/* 3 列编辑物风格说明 — 去卡片化 */}
       <section className="border-t border-gray-100 pt-7">
-        <p className="text-eyebrow-mute mb-5 px-0.5">Why it works</p>
+        <p className="text-eyebrow-mute mb-5 px-0.5">{t('ai.why_eyebrow')}</p>
         <div className="grid grid-cols-1 gap-x-10 gap-y-6 md:grid-cols-3 md:divide-x md:divide-gray-100">
           {FEATURES.map(([num, title, desc], idx) => (
             <article

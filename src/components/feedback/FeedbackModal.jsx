@@ -2,10 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, CheckCircle } from 'lucide-react'
 import { submitFeedback } from '../../utils/feedbackApi'
+import { useLanguage } from '../../i18n/LanguageContext'
 
 const MAX_LEN = 2000
 
 export default function FeedbackModal({ open, onClose }) {
+  const { t } = useLanguage()
   const [body, setBody] = useState('')
   const [status, setStatus] = useState('idle') // 'idle' | 'submitting' | 'success' | 'error'
   const [errorMsg, setErrorMsg] = useState('')
@@ -43,7 +45,7 @@ export default function FeedbackModal({ open, onClose }) {
       setStatus('success')
     } catch (err) {
       setStatus('error')
-      setErrorMsg(err?.message || '提交失败，请稍后重试')
+      setErrorMsg(err?.message || t('feedback.submit_failed'))
     }
   }
 
@@ -71,13 +73,13 @@ export default function FeedbackModal({ open, onClose }) {
           >
             {/* 标题行（固定不随滚动消失） */}
             <div className="flex shrink-0 items-center justify-between px-5 pt-5 pb-1">
-              <h2 className="text-base font-semibold text-base-text">问题反馈</h2>
+              <h2 className="text-base font-semibold text-base-text">{t('feedback.title')}</h2>
               <button
                 type="button"
                 onClick={handleClose}
                 disabled={status === 'submitting'}
                 className="inline-flex h-7 w-7 items-center justify-center rounded-full text-base-mute hover:bg-gray-100 transition-colors disabled:opacity-40"
-                aria-label="关闭"
+                aria-label={t('common.close')}
               >
                 <X size={16} />
               </button>
@@ -86,22 +88,22 @@ export default function FeedbackModal({ open, onClose }) {
             {status === 'success' ? (
               <div className="flex flex-col items-center gap-3 px-5 pt-6 pb-7 text-center overflow-y-auto">
                 <CheckCircle size={40} className="text-brand-cyan" />
-                <p className="text-sm font-semibold text-base-text">感谢你的反馈！</p>
+                <p className="text-sm font-semibold text-base-text">{t('feedback.success_title')}</p>
                 <p className="text-xs text-base-mute leading-relaxed">
-                  我们已经收到你的建议，会认真阅读并持续改进 CPTI。
+                  {t('feedback.success_desc')}
                 </p>
                 <button
                   type="button"
                   className="btn-primary mt-2 px-8"
                   onClick={onClose}
                 >
-                  好的
+                  {t('common.ok')}
                 </button>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="px-5 pt-3 pb-5 space-y-3 overflow-y-auto">
                 <p className="text-xs leading-relaxed text-base-mute">
-                  遇到 bug、体验问题，或有任何建议？欢迎告诉我们。
+                  {t('feedback.desc')}
                 </p>
 
                 <div className="space-y-1">
@@ -109,7 +111,7 @@ export default function FeedbackModal({ open, onClose }) {
                     ref={textareaRef}
                     value={body}
                     onChange={(e) => setBody(e.target.value.slice(0, MAX_LEN))}
-                    placeholder="请描述你遇到的问题或建议..."
+                    placeholder={t('feedback.placeholder')}
                     rows={4}
                     className="w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-base md:text-sm text-base-text placeholder:text-gray-400 focus:border-brand-cyan focus:outline-none focus:ring-1 focus:ring-brand-cyan transition-colors"
                     disabled={status === 'submitting'}
@@ -134,14 +136,14 @@ export default function FeedbackModal({ open, onClose }) {
                     disabled={status === 'submitting'}
                     className="btn-ghost flex-1 py-2.5 text-sm disabled:opacity-50"
                   >
-                    取消
+                    {t('common.cancel')}
                   </button>
                   <button
                     type="submit"
                     disabled={status === 'submitting' || !body.trim()}
                     className="btn-primary flex-1 py-2.5 text-sm disabled:opacity-50"
                   >
-                    {status === 'submitting' ? '提交中...' : '提交'}
+                    {status === 'submitting' ? t('common.submitting') : t('common.submit')}
                   </button>
                 </div>
               </form>
