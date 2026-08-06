@@ -1,512 +1,169 @@
-﻿# CPTI - 亲密光谱测试（Couple Type Indicator）
+﻿<p align="center">
+  <img src="public/logo.png" alt="CPTI logo" width="96" />
+</p>
 
-一个面向情侣关系的多端 H5 测评应用。  
-通过 4 个维度、16 种类型与可分享结果页，帮助用户理解“关系如何运作”，而非给个人贴标签。
+<h1 align="center">CPTI · 亲密光谱测试</h1>
 
-**当前状态：V1.0 已上线。** 上线 3 天单篇小红书笔记自然浏览 3200+，跨端漏斗转化率约 4.2%，已沉淀 150+ 份真实测评样本。
+<p align="center">
+  <strong>在 16 种爱情的颜色里，找到属于你们的那一抹光。</strong>
+</p>
 
----
+<p align="center">
+  专为情侣设计的关系测评 —— 测的不是「你是谁」，而是「你们怎么相处」。
+</p>
 
-## 目录
+<!-- README-I18N:START -->
 
-- [项目简介](#项目简介)
-- [核心能力](#核心能力)
-- [技术栈](#技术栈)
-- [项目结构](#项目结构)
-- [本地开发](#本地开发)
-- [环境变量](#环境变量)
-- [数据与算法说明](#数据与算法说明)
-- [统计系统说明](#统计系统说明)
-- [问题反馈系统说明](#问题反馈系统说明)
-- [AI 关系助手说明](#ai-关系助手说明)
-- [部署说明](#部署说明)
-- [常见问题（开发侧）](#常见问题开发侧)
-- [后续迭代建议](#后续迭代建议)
+<p align="center">
+  <strong>汉语</strong> · <a href="./README.en.md">English</a>
+</p>
 
----
+<!-- README-I18N:END -->
 
-## 项目简介
+<p align="center">
+  <img src="https://img.shields.io/badge/status-V1.0%20已上线-0d9488" alt="V1.0 已上线" />
+  <img src="https://img.shields.io/badge/platform-Web%20·%20手机电脑都能用-3b82f6" alt="Web 多端" />
+  <img src="https://img.shields.io/badge/情侣类型-16%20种-a855f7" alt="16 种情侣类型" />
+  <a href="https://www.cpti.site"><img src="https://img.shields.io/badge/体验-www.cpti.site-ec4899" alt="线上体验" /></a>
+</p>
 
-**CPTI（Couple Type Indicator）** 是一个关系测评产品，聚焦“情侣互动模式”而不是“个人性格标签”。  
-当前版本包含：
+<p align="center">
+  <a href="#这是什么">概览</a>
+  ·
+  <a href="#为什么有意思">亮点</a>
+  ·
+  <a href="#怎么玩">怎么玩</a>
+  ·
+  <a href="#产品一览">产品一览</a>
+  ·
+  <a href="#适合谁">适合谁</a>
+  ·
+  <a href="#本地跑起来可选">本地运行</a>
+  ·
+  <a href="https://www.cpti.site">线上体验</a>
+</p>
 
-- 单人感知版：先看用户主观视角下的关系画像
-- 双人拼图版：双方独立作答后合成最终关系类型
-- 结果报告页：展示代码类型、光谱分布、优势挑战、冲突模式、建议等
-- AI 关系助手：测试后基于当前 CPTI 结果进行轻量情感问答，聊天记录仅保存在当前浏览器
-- 统计页：展示实时（或回退）样本分布与类型趋势
-- 问题反馈：全站可用的轻量反馈入口，写入 Supabase `user_feedback` 表
+<br />
 
-> 设计原则：移动端优先、动画流畅、静态前端优先、可快速社交传播。
-
----
-
-## 核心能力
-
-### 1) 测评流程
-
-- 第 0 题选择模式（单人 / 双人）
-- 32 道情境题（4 维度 * 8 题）
-- 7 点量表作答（+3 至 -3）
-- 自动进入 2 秒分析过渡页
-- 生成结果报告页，可输入昵称并分享
-
-### 2) 双人拼图机制
-
-- 第一位完成后生成一次性邀请链接（仅携带 `dualToken`）
-- 第二位通过链接进入并完成答题
-- 邀请链接默认 24 小时有效，成功提交后立即失效
-- 系统合成双方结果，输出：
-  - 关系主类型
-  - 双方各自视角类型
-  - 最一致维度 / 最错位维度
-
-### 3) 数据统计能力
-
-- 客户端在结果生成后上报 `resultCode + mode`
-- Serverless API 写入 Supabase
-- 统计页优先读取在线聚合结果，失败时回退到本地演示数据
+<p align="center">
+  <img src="docs/screenshots/desktop/home-mode-select.png" alt="CPTI 首页：选择单人速通或双人拼图" width="860" />
+</p>
 
 ---
 
-## 技术栈
+## 这是什么？
 
-- **前端框架**：React 18
-- **构建工具**：Vite 5
-- **样式系统**：Tailwind CSS 3
-- **动画**：Framer Motion
-- **图标**：Lucide React
-- **后端形态**：Vercel Serverless（`/api`）+ Cloudflare Pages Functions（`/functions/api`）
-- **数据库**：Supabase（统计存储与聚合视图）
-- **AI 模型**：DeepSeek V4 Flash（OpenAI-compatible Chat Completions）
+市面上的人格测试大多围绕「个人」——你是内向还是外向、你喜欢计划还是随性。  
+**CPTI 换了一个最小单位：关系本身。**
 
----
+通过 32 道生活化情境题，它帮情侣看见彼此的相处模式：黏还是需要空间、偏浪漫还是偏务实、爱计划还是随性、冲突时直球还是先冷静。  
+最终生成一份可分享的「亲密光谱报告」——像一面镜子，不评判好坏，只帮你们把感觉说清楚。
 
-## 项目结构
-
-```text
-CPTI/
-├─ api/                         # Vercel Serverless API（兼容层）
-│  ├─ _shared/
-│  │  └─ stats-helpers.js       # 统计聚合辅助函数、合法类型定义
-│  ├─ dual-invite-create.js     # 创建双人邀请 token（24h）
-│  ├─ dual-invite-consume.js    # 校验/消费双人邀请 token
-│  ├─ stats-submit.js           # 提交测评结果（写入 Supabase）
-│  ├─ telemetry-submit.js       # 匿名埋点（每题分布/每维得分聚合）
-│  ├─ stats-summary.js          # 拉取统计汇总（读视图）
-│  ├─ feedback-submit.js        # 提交用户反馈（写入 user_feedback 表）
-│  └─ ai-chat.js                # AI 关系助手（调用 DeepSeek）
-├─ functions/
-│  └─ api/                      # Cloudflare Pages Functions（兼容层）
-│     ├─ dual-invite-create.js
-│     ├─ dual-invite-consume.js
-│     ├─ stats-submit.js
-│     ├─ telemetry-submit.js
-│     ├─ stats-summary.js
-│     ├─ feedback-submit.js
-│     └─ ai-chat.js
-├─ public/
-│  ├─ logo.png
-│  └─ images/cpti/              # 16 型配图（按 CODE 命名）
-├─ src/
-│  ├─ components/
-│  │  ├─ layout/                # AppShell / Header
-│  │  ├─ home/                  # 首页引导模块
-│  │  ├─ types/                 # 情侣类型总览页
-│  │  ├─ stats/                 # 统计页
-│  │  ├─ faq/                   # FAQ 页
-│  │  ├─ about/                 # About 页
-│  │  ├─ feedback/              # 问题反馈（FeedbackContext + FeedbackModal）
-│  │  ├─ chat/                  # AI 关系助手
-│  │  ├─ Questionnaire.jsx      # 问卷核心流程
-│  │  ├─ LikertScale.jsx        # 7 点量表组件
-│  │  ├─ Loading.jsx            # 分析过渡页
-│  │  └─ ResultPoster.jsx       # 结果报告页
-│  ├─ data/
-│  │  ├─ questions.js           # 题库与模式文案
-│  │  ├─ results.js             # 16 型完整结果文案库
-│  │  ├─ stats.js               # 本地统计回退数据
-│  │  ├─ typeGroups.js          # 色系分组元数据
-│  │  └─ typeImages.js          # 类型配图路径工具
-│  ├─ utils/
-│  │  ├─ scoring.js             # 计分、类型判定、单双人结果计算
-│  │  ├─ inviteCodec.js         # 双人邀请 token 参数读写
-│  │  ├─ statsApi.js            # 统计 API 客户端请求
-│  │  ├─ feedbackApi.js         # 反馈提交 API 客户端
-│  │  ├─ aiChatApi.js           # AI 对话 API 客户端
-│  │  ├─ aiChatContext.js       # AI 对话上下文摘要生成
-│  │  └─ typeListing.js         # 类型列表简介生成
-│  ├─ App.jsx                   # 顶层视图切换与流程编排
-│  ├─ main.jsx
-│  └─ index.css
-├─ supabase/
-│  ├─ stats_schema.sql          # Supabase 表、索引、RLS、统计视图
-│  └─ user_feedback.sql         # user_feedback 表与 RLS（反馈功能）
-├─ server/
-│  ├─ stats-service.js          # Vercel + Cloudflare 共用统计服务逻辑
-│  ├─ invite-service.js         # 双人邀请令牌创建/校验/消费
-│  ├─ telemetry-service.js      # 匿名埋点聚合写入逻辑
-│  ├─ feedback-service.js       # 用户反馈写入逻辑（含限流）
-│  └─ ai-chat-service.js        # DeepSeek 对话调用与输入校验
-├─ cpti_prd.md                  # 产品需求文档（权威）
-└─ README.md
-```
+> [!TIP]
+> 一个人先测，也能先看见「我眼中的我们」；邀请对方一起拼图，才能解锁真正的情侣合成结果。
 
 ---
 
-## 本地开发
+## 为什么有意思？
 
-### 1) 安装依赖
+| 亮点 | 一句话 |
+|------|--------|
+| **测关系，不贴个人标签** | 关注相处方式，而不是给某一方下定论 |
+| **单人速通 + 双人拼图** | 可以先自己看，也可以两人独立作答再合成 |
+| **16 种情侣类型 · 四大色系** | 蜜桃粉、湖水蓝、罗兰紫、薄荷绿，好记也好晒 |
+| **结果可分享** | 报告适合截图、发朋友圈、发给 TA |
+| **AI 关系助手** | 带着你们的结果聊具体问题，而不是空泛鸡汤 |
+| **不做对错评判** | 只提供共同语言，方便继续沟通 |
+
+---
+
+## 怎么玩？
+
+三步就够：
+
+1. **选模式** — 单人速通先看自己的视角，或双人拼图邀请对方一起完成  
+2. **答 32 道情境题** — 都是日常相处里会碰到的小事，按真实感受选即可  
+3. **看报告、对照、分享** — 保存结果，或把链接发给 TA，拼出更完整的「我们」
+
+双人拼图时，你们会各自独立作答；系统再把两边视角合在一起，标出**最合拍**和**最容易错位**的地方——适合当作一次轻松的对照，而不是考试打分。
+
+---
+
+## 产品一览
+
+### 16 种情侣类型
+
+四条相处光谱交叉组合，落成 16 种类型，并按色系分组，方便记忆和传播。
+
+<p align="center">
+  <img src="docs/screenshots/desktop/couple-types.png" alt="情侣类型总览：四大色系与 16 种类型" width="860" />
+</p>
+
+四条光谱大致是：
+
+- **空间** — 更黏，还是更需要边界  
+- **表达** — 偏仪式与浪漫，还是偏务实行动  
+- **节奏** — 爱计划，还是更随性  
+- **冲突** — 当场直球沟通，还是先冷静再谈  
+
+### AI 关系助手
+
+测完之后，可以带着你们的类型、光谱和冲突模式，和助手聊具体情境——比如「总因为临时改计划吵架怎么办」。  
+它会基于**当前这份结果**给建议，而不是一套通用说教。
+
+<p align="center">
+  <img src="docs/screenshots/desktop/ai-companion.png" alt="AI 关系助手介绍页" width="860" />
+</p>
+
+> 对话记录只留在你当前的浏览器里；发给助手的也只是必要的关系摘要，不会把昵称和逐题答案整包上传。
+
+### 大家的光谱长什么样？
+
+统计页会汇总匿名测评样本，让你看看自己的类型在人群里大概落在哪——同样只作观察参考，不作好坏排序。
+
+<p align="center">
+  <img src="docs/screenshots/desktop/statistics.png" alt="亲密关系光谱统计页" width="860" />
+</p>
+
+上线初期，单篇小红书笔记自然浏览曾到 3200+，并沉淀 150+ 份真实测评样本——说明「测完想分享」这件事是成立的。
+
+---
+
+## 适合谁？
+
+- 想和伴侣用轻松方式对照相处模式的情侣  
+- 好奇「我眼中的我们」和「真正的我们」差多少的人  
+- 需要一份好晒、好聊的关系报告的朋友  
+
+> [!NOTE]
+> CPTI 是沟通与自我探索的小工具，**不是**心理诊断或医疗建议。结果用来开启对话，而不是给关系下最终判决。
+
+---
+
+## 本地跑起来（可选）
+
+想在自己电脑上打开这份项目：
 
 ```bash
 npm install
-```
-
-### 2) 启动开发环境
-
-```bash
 npm run dev
 ```
 
-### 3) 构建生产包
+浏览器访问终端里提示的本地地址即可。完整产品说明见 [`cpti_prd.md`](./cpti_prd.md)。
 
-```bash
-npm run build
-```
-
-### 4) 本地预览构建结果
-
-```bash
-npm run preview
-```
+若需要接上统计、双人邀请或 AI 助手等线上能力，复制 `.env.example` 为 `.env.local`，按文件里的说明填入配置后再部署即可。
 
 ---
 
-## 环境变量
+## 技术一瞥
 
-复制 `.env.example` 为 `.env.local`（或在部署平台直接配置）：
+前端用 React + Vite 搭建，手机和电脑都能用；动画与结果页侧重「好读、好分享」。  
+需要存统计、邀请或对话时，走轻量服务端能力；日常答题与出结果尽量在前端完成，减少等待感。
 
-```env
-SUPABASE_URL=your_supabase_project_url
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-DEEPSEEK_API_KEY=your_deepseek_api_key
-DEEPSEEK_BASE_URL=https://api.deepseek.com
-DEEPSEEK_MODEL=deepseek-v4-flash
-```
-
-说明：
-
-- `SUPABASE_SERVICE_ROLE_KEY` 仅用于 Serverless API，**不可暴露给浏览器端**
-- 本项目客户端不直连写库，提交与汇总均走 `/api/*`
-- `DEEPSEEK_API_KEY` 仅用于 Serverless API，浏览器端只请求 `/api/ai-chat`
-- `DEEPSEEK_BASE_URL` 与 `DEEPSEEK_MODEL` 可按部署环境覆盖，默认使用 `deepseek-v4-flash`
+更细的实现与接口说明，请直接看源码与 [`cpti_prd.md`](./cpti_prd.md)——这份 README 刻意把产品讲清楚，把工程细节留给代码。
 
 ---
 
-## 数据与算法说明
-
-### 1) 维度模型
-
-- `SI`：空间距离（S 黏合 / I 独立）
-- `RP`：情感表达（R 浪漫 / P 务实）
-- `OF`：生活节奏（O 有序 / F 随性）
-- `DA`：冲突解决（D 直球 / A 缓冲）
-
-### 2) 题目计分
-
-- 7 点量表映射：`[+3, +2, +1, 0, -1, -2, -3]`
-- 每题有 `polarity`，用于决定分数方向翻转
-- 每维总分 `>= 0` 取正向字母，否则取反向字母
-
-### 3) 类型判定
-
-- 4 个维度拼接为四字母类型码（如 `SROD`）
-- 同时计算每个字母百分比，展示在结果光谱条中
-
-### 4) 双人合成
-
-- 分别计算双方维度得分
-- 对每维做平均后得到关系合成得分
-- 额外输出一致性分析（最一致 / 最错位维度）
-
----
-
-## 统计系统说明
-
-### 提交接口：`POST /api/stats-submit`
-
-请求体：
-
-```json
-{
-  "resultCode": "SROD",
-  "mode": "single"
-}
-```
-
-特性：
-
-- 参数合法性校验（16 型白名单 + `single|dual`）
-- 基于 IP + UA 的 hash 做窗口限流（15 分钟最多 3 次）
-- 写入 `quiz_submissions` 表
-
-### 匿名埋点接口：`POST /api/telemetry-submit`
-
-用途：用于分析题库与量表是否存在系统性偏置（例如某维度长期偏正/偏负、某些题大量“极端同意”）。
-
-请求体（匿名，不包含昵称/结果文案等）：
-
-```json
-{
-  "mode": "single",
-  "questionCount": 32,
-  "answers": { "SI-1": 0, "DA-1": 3 },
-  "dimensionScores": { "SI": 12, "RP": 4, "OF": -3, "DA": 9 }
-}
-```
-
-特性：
-
-- 基于 IP + UA hash 做窗口限流（15 分钟最多 3 次）
-- 不存储单个用户答案表，只写“按天聚合计数”
-- 写入/更新：
-  - `telemetry_submissions`（仅用于限流）
-  - `quiz_question_choice_agg`（每题 0-6 档位分布）
-  - `quiz_dimension_score_agg`（四维原始得分分布）
-
-### 汇总接口：`GET /api/stats-summary`
-
-流程：
-
-- 查询 `stats_summary_view`
-- 还原 16 型计数并计算占比、Top3/Bottom3、色系分布
-- 响应缓存：`s-maxage=60, stale-while-revalidate=300`
-
-### 前端失败策略
-
-- 首屏先显示骨架屏（不注入静态统计值）
-- 若在线汇总失败，显示错误提示与 `--` 占位
-- 用户可点击“重试获取数据”手动重拉
-
----
-
-## 问题反馈系统说明
-
-### 反馈入口
-
-- **移动端**：顶栏 Logo 右侧的气泡图标按钮（`md:hidden`）
-- **桌面端**：顶栏下方、内容区右上角的「反馈」链接按钮（`hidden md:flex`）
-
-### 提交接口：`POST /api/feedback-submit`
-
-请求体：
-
-```json
-{
-  "body": "用户填写的反馈内容（1-2000 字符）",
-  "pagePath": "/（当前页面路径，可选）"
-}
-```
-
-特性：
-
-- 必填校验（`body` 非空，≤ 2000 字符）
-- 基于 IP + UA 的 hash 做窗口限流（60 分钟最多 5 次）
-- 写入 `user_feedback` 表，存储 `body`、`page_path`、`fingerprint_hash`
-- 浏览器不可直连写库（RLS 全拦截）
-
-### 前端交互说明
-
-- 点击入口打开固定蒙层 + 卡片弹层（`FeedbackModal`）
-- 提交中禁用按钮，防止重复提交
-- 成功后展示感谢提示，关闭按钮收起弹层
-- 失败时展示错误信息并允许重试
-- 状态通过 React Context（`FeedbackProvider`）管理，无需 props 透传
-
-## AI 关系助手说明
-
-### 功能定位
-
-完成测评后解锁，基于当前 CPTI 结果进行轻量情感问答。
-聊天记录仅保存在当前浏览器，刷新页面后仍可查看。
-
-### 对话接口：`POST /api/ai-chat`
-
-请求体：
-
-```json
-{
-  "context": {
-    "mode": "single",
-    "code": "SROD",
-    "percentages": { "S": 88, "I": 12 },
-    "strengths": [],
-    "challenges": [],
-    "conflictPattern": { "pattern": "...", "resolution": "..." }
-  },
-  "messages": [
-    { "role": "user", "content": "我们总因为计划变化吵架，怎么办？" }
-  ]
-}
-```
-
-特性：
-
-- 不传输原始答题数据、昵称等隐私信息，仅接收必要的关系摘要（类型码、四维百分比、三条优势挑战、冲突模式）
-- 流式输出（SSE）：`Content-Type: text/event-stream`，逐字推流，须使用 Edge Runtime
-- 基于 `IP + UA` sha256 指纹限流：10 分钟内最多 10 次
-- 单条消息长度上限 800 字，上下文保留最近 6 条对话
-- 最后一条消息必须是 user 角色
-
-SSE 事件格式：
-
-```
-data: {"type":"open","t":1234567890}          ← 首字节心跳（客户端识别但忽略内容）
-data: {"delta":"这","message":"这"}           ← 流式内容分块
-data: {"done":true,"message":"完整回复"}      ← 结束
-data: {"error":"...","code":"..."}            ← 错误
-```
-
-### 前端交互说明
-
-- **未测试状态**：显示解锁引导页，引导用户先完成测评
-- **已测试状态**：进入独立聊天页，工具栏左侧为"返回结果报告"按钮
-- **多会话**：同一类型结果下支持最多 20 个会话，每个会话最多 60 条消息
-- **客户端三档超时**：首字节 20s、流中途 idle 30s、全程 hard 70s，避免 UI 无响应
-- **分享导出**：对话可导出为带主题色的 PNG 长图（html2canvas）或 Markdown 文本
-- 桌面端左侧为可折叠的会话历史侧栏，移动端为右侧抽屉
-
----
-
-## 部署说明
-
-支持两种部署平台：**Vercel** 与 **Cloudflare Pages**
-
-### 1) 基础配置
-
-- Framework Preset：Vite
-- Build Command：`npm run build`
-- Output Directory：`dist`
-
-### 2) 环境变量（Vercel / Cloudflare 均需配置）
-
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `DEEPSEEK_API_KEY`
-- `DEEPSEEK_BASE_URL`
-- `DEEPSEEK_MODEL`
-
-### 3) 平台路由说明
-
-- Vercel：使用 `api/` 下函数文件
-- Cloudflare Pages：使用 `functions/` 下函数文件
-- 前端始终请求统一路径：
-  - `/api/stats-submit`
-  - `/api/stats-summary`
-  - `/api/dual-invite-create`
-  - `/api/dual-invite-consume`
-  - `/api/feedback-submit`
-  - `/api/ai-chat`
-
-### 4) Supabase 初始化
-
-在 Supabase SQL Editor **依次**执行：
-
-1. `supabase/stats_schema.sql`
-2. `supabase/user_feedback.sql`
-
-`stats_schema.sql` 将创建：
-
-- `quiz_submissions` 数据表
-- `dual_invites` 一次性双人邀请令牌表
-- 匿名埋点相关表与 RPC（用于题库分析与偏差诊断）
-- 必要索引
-- RLS 策略（禁用客户端直接访问该表）
-- `stats_summary_view` 聚合视图（供 API 查询）
-
-`user_feedback.sql` 将创建：
-
-- `user_feedback` 用户反馈表（含字段：`body`、`page_path`、`fingerprint_hash`）
-- 必要索引
-- RLS 策略（客户端无法直接读写，仅 Service Role 可插入）
-
----
-
-## 常见问题（开发侧）
-
-### Q1：为什么统计页显示“--”并提示获取失败？
-
-通常是以下原因：
-
-- 未配置 Supabase 环境变量（或配在错误环境）
-- 数据库 SQL 未初始化
-- API 路由部署异常或返回非 200
-- Cloudflare 下未生效 `functions/api/*` 路由
-
-## 图片性能验收阈值
-
-针对结果页与情侣类型页，建议按以下阈值做灰度验收（弱网 4G + 中端机）：
-
-- 结果页主图可见时间：`P75 <= 1.8s`，`P95 <= 2.5s`
-- 情侣类型页首屏 4 张图可见时间：`P75 <= 1.2s`，`P95 <= 1.8s`
-- 图片加载失败率：`< 0.5%`
-- WebP 命中率：`>= 95%`
-
-前端已内置轻量级图片指标采集（`src/utils/imageMetrics.js`），会按页面记录 `success / fallback-success / failed` 与加载耗时，可用于灰度期抽样评估。
-
-### Q2：如何新增或修改题目？
-
-编辑 `src/data/questions.js`，保持：
-
-- `id` 唯一
-- `dimension` 与 `polarity` 正确
-- `QUESTIONS_PER_DIMENSION` 与实际题量一致
-
-### Q3：如何新增结果文案？
-
-编辑 `src/data/results.js` 对应类型条目，确保字段完整（标题、描述、优势、挑战、冲突模式、tips、funFacts 等）。
-
-### Q4：为什么双人链接失效？
-
-常见场景：
-
-- 链接已被第二位成功使用（一次性链接）
-- 链接超过 24 小时有效期
-- token 被篡改、截断或不存在
-- 当前题库长度与邀请生成时不一致（防错保护）
-
-对应处理逻辑在 `src/utils/inviteCodec.js`、`src/components/Questionnaire.jsx` 与 `server/invite-service.js`。
-
----
-
-## 后续迭代建议
-
-### 内容与增长
-
-- **题库调优**：基于匿名埋点数据（每题 0-6 档位日聚合、四维得分分布）识别偏置题目，优化量表鉴别力
-- **稀有类型揭秘营销**：借助 Supabase 样本分布数据策划系列内容，驱动二次截流传播
-- **双人邀请转化优化**：在单人结果页强化「邀请 TA 拼图」入口，提升从单人到双人的裂变率
-
-### 功能完善
-
-- **结果海报一键导出**：当前依赖「长按图片保存」，计划接入已引入的 html2canvas 补全 PNG 导出按鈕
-- **双人模式状态追踪**：邀请已查看 / 已完成等状态通知，降低等待期流失
-- **引入自动化测试**：关键流程（计分、邀请令牌、草稿恢复）E2E 覆盖
-
-### 平台与工程
-
-- **统计 API 防刷增强**：验证码 / WAF / 设备指纹策略升级
-- **i18n 文案管理**：提炼结构化多语言支持，优先扩展繁体中文
-
-
-
----
-
-如果你正在接手本项目，建议先阅读：
-
-1. `cpti_prd.md`（产品目标与约束）  
-2. `src/App.jsx`（流程编排）  
-3. `src/components/Questionnaire.jsx` + `src/utils/scoring.js`（核心业务）  
-4. `src/components/ResultPoster.jsx` + `src/data/results.js`（结果呈现）  
-5. `api/` + `supabase/stats_schema.sql`（统计闭环）
-
+<p align="center">
+  <a href="https://www.cpti.site"><strong>去测一次 → www.cpti.site</strong></a>
+</p>
