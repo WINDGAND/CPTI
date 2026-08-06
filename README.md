@@ -96,7 +96,7 @@
 四条相处光谱交叉组合，落成 16 种类型，并按色系分组，方便记忆和传播。
 
 <p align="center">
-  <img src="docs/screenshots/desktop/couple-types.png" alt="情侣类型总览：四大色系与 16 种类型" width="860" />
+  <img src="docs/screenshots/desktop/couple-types.jpeg" alt="情侣类型总览：四大色系与 16 种类型" width="860" />
 </p>
 
 四条光谱大致是：

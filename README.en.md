@@ -96,7 +96,7 @@ In Duo Puzzle, you each answer on your own. The system then blends both perspect
 Four relationship spectra combine into 16 types, grouped by color family so they are easy to remember and share.
 
 <p align="center">
-  <img src="docs/screenshots/desktop/couple-types.png" alt="Couple types overview: four color families and 16 types" width="860" />
+  <img src="docs/screenshots/desktop/couple-types.jpeg" alt="Couple types overview: four color families and 16 types" width="860" />
 </p>
 
 The four spectra, roughly:
