@@ -38,7 +38,7 @@ export default function HomeStepCards() {
             transition={{ duration: 0.45, delay: idx * 0.08, ease: [0.16, 0.84, 0.34, 1] }}
             className={[
               item.accentClass,
-              'relative py-1 md:py-1',
+              'group relative py-1 md:py-1',
               idx > 0 ? 'border-t border-gray-100 md:border-t-0' : '',
             ].join(' ')}
           >
@@ -46,13 +46,13 @@ export default function HomeStepCards() {
               {/* 大号编号 + 左侧短色条（桌面端） */}
               <div className="flex items-baseline gap-2 md:mb-1">
                 <span
-                  className="ed-numeral text-2xl md:text-[32px] leading-none"
+                  className="ed-numeral text-2xl md:text-[32px] leading-none transition-transform duration-300 ease-out md:group-hover:-translate-y-0.5 md:group-hover:scale-110"
                   style={{ color: item.accent }}
                 >
                   0{item.step}
                 </span>
                 <span
-                  className="hidden md:block h-[2px] w-8 rounded-full"
+                  className="hidden md:block h-[2px] w-8 rounded-full transition-all duration-300 ease-out md:group-hover:w-11"
                   style={{ background: item.accent, opacity: 0.85 }}
                   aria-hidden
                 />
@@ -66,11 +66,11 @@ export default function HomeStepCards() {
 
               <div className="min-w-0">
                 <div className="flex items-center gap-2 md:mb-0.5">
-                  <h3 className="text-sm md:text-[15px] font-bold leading-snug text-base-text">
+                  <h3 className="text-sm md:text-[15px] font-bold leading-snug text-base-text transition-colors duration-200 md:group-hover:text-black">
                     {item.title}
                   </h3>
                   <item.Icon
-                    className="hidden md:block h-3.5 w-3.5"
+                    className="hidden md:block h-3.5 w-3.5 transition-transform duration-300 ease-out md:group-hover:rotate-6 md:group-hover:scale-110"
                     style={{ color: item.accent }}
                     strokeWidth={2}
                     aria-hidden

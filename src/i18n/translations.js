@@ -80,6 +80,8 @@ const zh = {
     step2_subtitle: '单人看关系感知，双人看最终 Couple Type',
     step3_title: '对照与分享',
     step3_subtitle: '保存结果，邀请对方拼出真正的我们',
+    spectrum_caption: '16 种爱情的颜色，先逛逛看 →',
+    spectrum_aria: '浏览全部 16 种情侣类型',
   },
 
   quiz: {
@@ -586,6 +588,8 @@ const en = {
     step2_subtitle: 'Solo shows your view, dual gives your Couple Type.',
     step3_title: 'Compare & share',
     step3_subtitle: 'Save the result and invite them to finish the puzzle.',
+    spectrum_caption: '16 shades of love — take a peek →',
+    spectrum_aria: 'Browse all 16 couple types',
   },
 
   quiz: {

@@ -409,6 +409,29 @@
     50%      { background-position: 100% 50%; }
   }
 
+  /* ── 首页光谱细带（品牌签名：四色渐变 + 缓慢流光）── */
+  .spectrum-ribbon {
+    @apply h-[3px] w-24 rounded-full;
+    background-image: linear-gradient(90deg, #F4A7B0 0%, #76B8E0 33%, #B8A0D0 66%, #8ED6B4 100%);
+    background-size: 200% 100%;
+    background-position: 0% 50%;
+    box-shadow: 0 0 10px rgba(118, 184, 224, 0.35);
+    animation: spectrum-ribbon-flow 8s ease-in-out infinite;
+  }
+  @keyframes spectrum-ribbon-flow {
+    0%, 100% { background-position: 0% 50%; }
+    50%      { background-position: 100% 50%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .spectrum-ribbon { animation: none; }
+  }
+
+  /* ── 首页 16 型图带：两侧渐隐，营造「无尽光谱」 ── */
+  .marquee-mask {
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+            mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+  }
+
   /* ── Likert 选中的 ripple 水波（外层 absolute 圆环散开 350ms）── */
   .ripple-burst {
     position: absolute;

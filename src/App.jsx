@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import AppShell from './components/layout/AppShell'
 import HomeStepCards from './components/home/HomeStepCards'
+import HomeSpectrumMarquee from './components/home/HomeSpectrumMarquee'
 import Questionnaire from './components/Questionnaire'
 import Loading from './components/Loading'
 import AiRelationshipPage from './components/chat/AiRelationshipPage'
@@ -325,7 +326,7 @@ export default function App() {
               选了模式后用户已经进入滚动答题节奏，紧凑感不会有负面影响。 */}
           <div className="pt-4 pb-4 text-center md:pt-8 md:pb-6">
             <p className="text-eyebrow mb-2.5">{t('home.eyebrow')}</p>
-            <h1 className="text-[26px] md:text-[36px] font-extrabold leading-tight mb-3 text-base-text">
+            <h1 className="text-[27px] md:text-[40px] font-extrabold leading-tight mb-3 text-base-text">
               <span className="cpti-word font-display" aria-label="CPTI">
                 <span className="cpti-gradient-bg" aria-hidden>
                   {['C', 'P', 'T', 'I'].map((char) => (
@@ -347,6 +348,7 @@ export default function App() {
             <p className="text-mute mx-auto max-w-xl text-sm md:text-[15px]">
               {t('home.subtitle')}
             </p>
+            <HomeSpectrumMarquee onOpenTypes={goCoupleTypes} />
           </div>
 
           <HomeStepCards />
