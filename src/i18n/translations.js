@@ -113,6 +113,8 @@ const zh = {
     likert_left: '同意',
     likert_right: '不认同',
     likert_aria: '选项 {score}',
+    question_tag: '第 {n} 题',
+    question_done_aria: '第 {n} 题，已作答',
 
     // 中断/邀请
     invite_legacy: '这份邀请链接来自旧版本，暂时无法继续，请让对方重新发起双人拼图。',
@@ -624,6 +626,8 @@ const en = {
     likert_left: 'Agree',
     likert_right: 'Disagree',
     likert_aria: 'Option {score}',
+    question_tag: 'Q{n}',
+    question_done_aria: 'Question {n}, answered',
 
     invite_legacy: 'This invitation link is from an older version and can no longer continue. Please ask them to start a new two-player puzzle.',
     invite_invalid_token: "This invitation link can't be recognized. Please ask them to copy the full link again.",

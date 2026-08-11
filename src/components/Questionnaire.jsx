@@ -844,14 +844,21 @@ export default function Questionnaire({ onComplete }) {
               </motion.span>
             )}
           </AnimatePresence>
-          <p className="text-[10px] text-base-mute ml-auto">
-            {modeChosen
-              ? `${currentModeCopy?.progressLabel ?? t('quiz.progress_default_label')} · ${selectedMode === 'dual'
-                ? inviteLink
-                  ? t('quiz.progress_invite_phase')
-                  : t('quiz.progress_player_n', { n: activePlayerIdx + 1 })
-                : t('quiz.progress_single_mode')} · ${answeredCount} / ${total}`
-              : t('quiz.progress_choose_mode')}
+          <p className="ml-auto flex items-baseline gap-1.5">
+            <span className="text-[10px] text-base-mute">
+              {modeChosen
+                ? `${currentModeCopy?.progressLabel ?? t('quiz.progress_default_label')} · ${selectedMode === 'dual'
+                  ? inviteLink
+                    ? t('quiz.progress_invite_phase')
+                    : t('quiz.progress_player_n', { n: activePlayerIdx + 1 })
+                  : t('quiz.progress_single_mode')}`
+                : t('quiz.progress_choose_mode')}
+            </span>
+            {modeChosen && (
+              <span className="text-sm font-black tabular-nums text-base-text leading-none">
+                {answeredCount}<span className="text-base-mute/60 font-semibold">/{total}</span>
+              </span>
+            )}
           </p>
         </div>
       </div>
@@ -1090,19 +1097,44 @@ export default function Questionnaire({ onComplete }) {
         {modeChosen && !inviteLink && localizedQuestions.slice(0, revealCount).map((q, idx) => {
           const isActive   = focusedIdx === idx
           const isAnswered = q.id in answers
+          // 三档层级：聚焦 1.0 > 已答 0.6 > 未答 0.32
+          // 让「已完成」比「未触及」更亮，滚动时一眼看出进度分布
+          const tierOpacity = isActive ? 1 : isAnswered ? 0.6 : 0.32
 
           return (
             <motion.div
               key={q.id}
               ref={el => { itemRefs.current[idx] = el }}
               animate={{
-                opacity: isActive ? 1 : 0.32,
+                opacity: tierOpacity,
                 y: isActive ? -2 : 0,
                 filter: isActive ? 'blur(0px)' : 'blur(0.3px)',
               }}
               transition={{ duration: 0.3, ease: [0.16, 0.84, 0.34, 1] }}
               className="border-b border-gray-100 last:border-0 py-8"
             >
+              {/* 题号 chip：聚焦=实心品牌色，已答=实心绿✓，未答=灰描边 */}
+              <div className="max-w-xl mx-auto mb-3 flex justify-center">
+                <span
+                  className={[
+                    'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold tabular-nums tracking-wide transition-colors duration-200',
+                    isActive
+                      ? 'bg-brand-cyan text-white shadow-sm'
+                      : isAnswered
+                        ? 'bg-[#33a474] text-white'
+                        : 'border border-gray-300 text-base-mute',
+                  ].join(' ')}
+                  aria-label={isAnswered ? t('quiz.question_done_aria', { n: idx + 1 }) : t('quiz.question_tag', { n: idx + 1 })}
+                >
+                  {isAnswered && !isActive && (
+                    <svg width="10" height="9" viewBox="0 0 12 10" fill="none" aria-hidden>
+                      <polyline points="1.5,5 4.5,8.5 10.5,1.5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                  {t('quiz.question_tag', { n: idx + 1 })}
+                </span>
+              </div>
+
               <p className={[
                 'leading-relaxed mb-7 max-w-xl mx-auto text-center transition-all duration-200',
                 isActive
