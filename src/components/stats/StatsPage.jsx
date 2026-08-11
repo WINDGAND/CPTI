@@ -5,11 +5,13 @@ import { fetchStatsSummary } from '../../utils/statsApi'
 import { useLanguage } from '../../i18n/LanguageContext'
 import { useLocalizedResults, useLocalizedTypeGroupMeta } from '../../i18n/useLocalizedData'
 
+// 16 型配色：围绕四大主色（桃/天蓝/紫/薄荷）做明度梯度，
+// 既保证 16 个扇区可区分，又与品牌温柔光谱和谐统一（替代原硬 rainbow）
 const TYPE_COLORS = [
-  '#EF476F', '#FF6B6B', '#F9844A', '#F9C74F',
-  '#90BE6D', '#43AA8B', '#2A9D8F', '#4D96FF',
-  '#277DA1', '#577590', '#7B2CBF', '#9D4EDD',
-  '#C77DFF', '#F15BB5', '#00BBF9', '#00F5D4',
+  '#F4A7B0', '#E98A99', '#DE6D82', '#F7C1C8', // 蜜桃粉系
+  '#76B8E0', '#5CA4D2', '#4290C4', '#9FCCEA', // 湖水蓝系
+  '#B8A0D0', '#A386BE', '#8E6CAC', '#C9B8DC', // 罗兰紫系
+  '#8ED6B4', '#6FC79D', '#54B888', '#AEE0C8', // 薄荷绿系
 ]
 
 const PLACEHOLDER_RANKED = Array.from({ length: 8 }, (_, index) => ({
@@ -44,6 +46,14 @@ const PLACEHOLDER_INSIGHTS = Array.from({ length: 3 }, (_, index) => ({
 
 function formatNumber(value, locale = 'zh-CN') {
   return new Intl.NumberFormat(locale).format(value)
+}
+
+// 分区滚动入场（与结果页/类型页同一套曲线）
+const sectionReveal = {
+  initial: { opacity: 0, y: 20 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true, amount: 0.12 },
+  transition: { duration: 0.5, ease: [0.16, 0.84, 0.34, 1] },
 }
 
 function CountUpNumber({ target, locale = 'zh-CN' }) {
@@ -339,7 +349,7 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
         </div>
       </header>
 
-      <section className="border-t border-gray-100 pt-6 md:pt-8">
+      <motion.section {...sectionReveal} className="border-t border-gray-100 pt-6 md:pt-8">
         <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
           <div className="flex items-start gap-3">
             <span className="mt-1 h-6 w-[3px] shrink-0 rounded-full bg-brand-cyan" aria-hidden />
@@ -460,9 +470,9 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
             })}
           </div>
         </div>
-      </section>
+      </motion.section>
 
-      <section className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-12 border-t border-gray-100 pt-7">
+      <motion.section {...sectionReveal} className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-12 border-t border-gray-100 pt-7">
         <div>
           <div className="flex items-start gap-3 mb-5">
             <span className="mt-1 h-6 w-[3px] shrink-0 rounded-full" style={{ background: 'linear-gradient(180deg, #F4A7B0, #8ED6B4)' }} aria-hidden />
@@ -530,9 +540,9 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
             ))}
           </div>
         </div>
-      </section>
+      </motion.section>
 
-      <section className="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-12 border-t border-gray-100 pt-7">
+      <motion.section {...sectionReveal} className="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-12 border-t border-gray-100 pt-7">
         <div className="relative pl-4">
           <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-full bg-emerald-500/70" aria-hidden />
           <div className="flex items-center gap-2 mb-3">
@@ -578,7 +588,7 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
             ))}
           </ol>
         </div>
-      </section>
+      </motion.section>
 
       <footer className="mt-12 pt-8 border-t border-gray-100 text-center">
         <p className="mb-5 text-sm text-base-mute">
