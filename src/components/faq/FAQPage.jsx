@@ -126,6 +126,14 @@ function FAQItem({ item, index, expanded, onToggle, tryThisLabel }) {
   )
 }
 
+// 分组滚动入场（与全站同一套曲线）
+const sectionReveal = {
+  initial: { opacity: 0, y: 20 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true, amount: 0.1 },
+  transition: { duration: 0.5, ease: [0.16, 0.84, 0.34, 1] },
+}
+
 export default function FAQPage({ onStartTest }) {
   const { t } = useLanguage()
   const FAQ_GROUPS = useMemo(() => FAQ_GROUP_DEFS.map((group) => ({
@@ -155,7 +163,7 @@ export default function FAQPage({ onStartTest }) {
 
       <div className="space-y-8">
         {FAQ_GROUPS.map((group) => (
-          <section key={group.id}>
+          <motion.section {...sectionReveal} key={group.id}>
             <div className="flex items-start gap-3 mb-2">
               <span className="mt-1 h-6 w-[3px] shrink-0 rounded-full bg-brand-cyan" aria-hidden />
               <div>
@@ -176,7 +184,7 @@ export default function FAQPage({ onStartTest }) {
                 />
               ))}
             </div>
-          </section>
+          </motion.section>
         ))}
       </div>
 

@@ -1,13 +1,25 @@
+import { motion } from 'framer-motion'
 import { ArrowRight, BookOpenText, Compass, Github, HeartHandshake, ShieldCheck } from 'lucide-react'
 import { useLanguage } from '../../i18n/LanguageContext'
 import { GITHUB_REPO_URL } from '../../utils/site'
 
+// 分区滚动入场（与结果页/类型页/统计页同一套曲线）
+const sectionReveal = {
+  initial: { opacity: 0, y: 20 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true, amount: 0.12 },
+  transition: { duration: 0.5, ease: [0.16, 0.84, 0.34, 1] },
+}
+
+// 四大 CPTI 维度各对应一个品牌色，替代统一 brand-cyan
+const DIMENSION_ACCENTS = ['#F4A7B0', '#76B8E0', '#B8A0D0', '#8ED6B4']
+
 function getDimensions(t) {
   return [
-    { code: 'S / I', title: t('dim.SI.title'), desc: t('dim.SI.desc') },
-    { code: 'R / P', title: t('dim.RP.title'), desc: t('dim.RP.desc') },
-    { code: 'O / F', title: t('dim.OF.title'), desc: t('dim.OF.desc') },
-    { code: 'D / A', title: t('dim.DA.title'), desc: t('dim.DA.desc') },
+    { code: 'S / I', title: t('dim.SI.title'), desc: t('dim.SI.desc'), accent: DIMENSION_ACCENTS[0] },
+    { code: 'R / P', title: t('dim.RP.title'), desc: t('dim.RP.desc'), accent: DIMENSION_ACCENTS[1] },
+    { code: 'O / F', title: t('dim.OF.title'), desc: t('dim.OF.desc'), accent: DIMENSION_ACCENTS[2] },
+    { code: 'D / A', title: t('dim.DA.title'), desc: t('dim.DA.desc'), accent: DIMENSION_ACCENTS[3] },
   ]
 }
 
@@ -39,7 +51,7 @@ function GhostButton({ onClick, children }) {
 /** 编辑物风格的 Section：左侧主题色色条 + eyebrow + 标题 + 内容（无白色卡片包裹） */
 function EditorialSection({ icon: Icon, eyebrow, title, accent = '#4298b4', children }) {
   return (
-    <section className="relative pl-4 md:pl-5 py-1">
+    <motion.section {...sectionReveal} className="relative pl-4 md:pl-5 py-1">
       <span
         className="absolute left-0 top-1 bottom-1 w-[3px] rounded-full"
         style={{ background: accent, opacity: 0.85 }}
@@ -53,7 +65,7 @@ function EditorialSection({ icon: Icon, eyebrow, title, accent = '#4298b4', chil
       <div className="space-y-3 text-sm leading-relaxed text-base-text">
         {children}
       </div>
-    </section>
+    </motion.section>
   )
 }
 
@@ -64,6 +76,13 @@ export default function AboutPage({ onStartTest, onGoFAQ }) {
   return (
     <div className="pb-10">
       <header className="pt-4 pb-7 text-center md:pt-8">
+        <motion.div
+          className="spectrum-ribbon mx-auto mb-5 h-[6px] w-28 rounded-full"
+          initial={{ opacity: 0, scaleX: 0.6 }}
+          animate={{ opacity: 1, scaleX: 1 }}
+          transition={{ duration: 0.5, ease: [0.16, 0.84, 0.34, 1] }}
+          aria-hidden
+        />
         <p className="text-eyebrow">{t('help.about_eyebrow')}</p>
         <h1 className="mt-2 text-2xl md:text-[30px] font-extrabold leading-tight text-base-text">{t('help.about_title')}</h1>
         <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-base-mute">
@@ -99,8 +118,8 @@ export default function AboutPage({ onStartTest, onGoFAQ }) {
           <div className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2 mt-3 mb-2">
             {DIMENSIONS.map((dimension) => (
               <div key={dimension.code} className="relative pl-3 py-1">
-                <span className="absolute left-0 top-1 bottom-1 w-[2px] rounded-full bg-brand-cyan/50" aria-hidden />
-                <p className="font-display text-[11px] font-bold tracking-wider text-brand-cyan">{dimension.code}</p>
+                <span className="absolute left-0 top-1 bottom-1 w-[2px] rounded-full" style={{ backgroundColor: dimension.accent }} aria-hidden />
+                <p className="font-display text-[11px] font-bold tracking-wider" style={{ color: dimension.accent }}>{dimension.code}</p>
                 <p className="mt-0.5 text-sm font-semibold text-base-text">{dimension.title}</p>
                 <p className="mt-0.5 text-xs leading-relaxed text-base-mute">{dimension.desc}</p>
               </div>
