@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { motion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowRight } from 'lucide-react'
 import { TYPE_GROUP_ORDER } from '../../data/typeGroups'
 import { getTypeListingIntro } from '../../utils/typeListing'
@@ -7,6 +7,7 @@ import { getTypeImageSources } from '../../data/typeImages'
 import { recordImageMetric } from '../../utils/imageMetrics'
 import { useLanguage } from '../../i18n/LanguageContext'
 import { useLocalizedResults, useLocalizedTypeGroupMeta } from '../../i18n/useLocalizedData'
+import TypeImageLightbox from './TypeImageLightbox'
 
 /** 分区滚动入场（与结果页同一套曲线） */
 const sectionReveal = {
@@ -112,6 +113,7 @@ export default function CoupleTypesPage({ onStartTest }) {
   const { t } = useLanguage()
   const RESULTS = useLocalizedResults()
   const TYPE_GROUP_META = useLocalizedTypeGroupMeta()
+  const [previewType, setPreviewType] = useState(null)
   const byGroup = TYPE_GROUP_ORDER.reduce((acc, key) => {
     acc[key] = RESULTS.filter((r) => r.group === key)
     return acc
@@ -203,27 +205,18 @@ export default function CoupleTypesPage({ onStartTest }) {
                         {type.title}
                       </h3>
 
-                      {/* 图片 + 悬浮「测测看」：点击直达测试 */}
+                      {/* 图片：点击放大查看（灯箱），悬浮仅保留轻微放大反馈 */}
                       <button
                         type="button"
-                        onClick={onStartTest}
-                        aria-label={t('types.card_aria').replace('{title}', type.title)}
-                        className="relative mt-3 mb-4 w-full max-w-[240px] cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-cyan"
+                        onClick={() => setPreviewType(type)}
+                        aria-label={t('types.card_view_aria').replace('{title}', type.title)}
+                        className="relative mt-3 mb-4 w-full max-w-[240px] cursor-zoom-in focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-cyan"
                         style={{ WebkitTapHighlightColor: 'transparent' }}
                       >
                         <TypeIllustration
                           code={type.code}
                           priority={index === 0 && itemIdx < 4}
                         />
-                        <span
-                          className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl bg-base-text/0 opacity-0 backdrop-blur-0 transition duration-300 group-hover:bg-base-text/30 group-hover:opacity-100 group-hover:backdrop-blur-[1px] group-focus-within:bg-base-text/30 group-focus-within:opacity-100"
-                          aria-hidden
-                        >
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/95 px-4 py-1.5 text-xs font-bold text-base-text shadow-md">
-                            {t('types.card_hint')}
-                            <ArrowRight className="h-3.5 w-3.5" strokeWidth={2.5} />
-                          </span>
-                        </span>
                       </button>
 
                       <p className="text-sm text-base-mute leading-relaxed text-center w-full max-w-[15.5rem] sm:max-w-[17rem] lg:max-w-[15rem] xl:max-w-[16rem] mx-auto">
@@ -241,6 +234,12 @@ export default function CoupleTypesPage({ onStartTest }) {
       <footer className="flex justify-center pt-10 pb-4">
         <StartTestButton onClick={onStartTest} label={t('common.start_test')} />
       </footer>
+
+      <AnimatePresence>
+        {previewType && (
+          <TypeImageLightbox type={previewType} onClose={() => setPreviewType(null)} />
+        )}
+      </AnimatePresence>
     </div>
   )
 }

@@ -44,5 +44,14 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // 低高度桌面视口（如 1366×768 笔记本、浏览器多栏书签栏）：
+    // 在保持桌面布局的前提下压缩纵向间距，让首页首屏一屏完整放下。
+    // 注意：必须包一层 html 选择器提升优先级（0-1-1），
+    // 否则自定义变体生成在 md: 之前，同优先级下会被 md: 覆盖。
+    function ({ addVariant }) {
+      addVariant('hshort', '@media (min-width: 768px) and (max-height: 840px) { html & }')
+      addVariant('hxshort', '@media (min-width: 768px) and (max-height: 620px) { html & }')
+    },
+  ],
 }

@@ -29,14 +29,14 @@ export default function HomeSpectrumMarquee({ onOpenTypes }) {
           loading="lazy"
           decoding="async"
           draggable="false"
-          className="h-[72px] w-[58px] shrink-0 rounded-lg object-cover shadow-sm ring-1 ring-black/[0.05] sm:h-[90px] sm:w-[72px]"
+          className="home-marquee-img h-[72px] w-[58px] shrink-0 rounded-lg object-cover shadow-sm ring-1 ring-black/[0.05] sm:h-[90px] sm:w-[72px]"
         />
       ))}
     </>
   )
 
   return (
-    <div className="mt-5 md:mt-6">
+    <div className="home-marquee mt-4 md:mt-4">
       {/* 四色光谱细带 —— 品牌签名，带缓慢流光 */}
       <div className="spectrum-ribbon mx-auto" aria-hidden />
 
@@ -45,7 +45,7 @@ export default function HomeSpectrumMarquee({ onOpenTypes }) {
       <button
         type="button"
         onClick={onOpenTypes}
-        className="marquee-mask group mt-4 block w-full cursor-pointer overflow-visible py-1 outline-none"
+        className="marquee-mask group mt-3 block w-full cursor-pointer overflow-visible py-1 outline-none"
         aria-label={t('home.spectrum_aria')}
       >
         {reduceMotion ? (
@@ -61,7 +61,7 @@ export default function HomeSpectrumMarquee({ onOpenTypes }) {
           </motion.div>
         )}
 
-        <p className="mt-3 text-center text-[11px] text-base-mute transition-colors duration-200 group-hover:text-brand-cyan">
+        <p className="mt-2 text-center text-[11px] text-base-mute transition-colors duration-200 group-hover:text-brand-cyan">
           {t('home.spectrum_caption')}
         </p>
       </button>

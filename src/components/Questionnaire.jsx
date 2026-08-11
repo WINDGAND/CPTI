@@ -710,7 +710,7 @@ export default function Questionnaire({ onComplete }) {
   const isQ0Active = focusedIdx === -1
 
   return (
-    <div>
+    <div className="home-quiz">
       {resumeDraft && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/35 backdrop-blur-[1px] px-4">
           <div className="w-full max-w-md rounded-card border border-gray-100 bg-white p-5 shadow-xl">
@@ -869,10 +869,10 @@ export default function Questionnaire({ onComplete }) {
             ref={q0Ref}
             animate={{ opacity: isQ0Active || !modeChosen ? 1 : 0.35 }}
             transition={{ duration: 0.25 }}
-            className="border-b border-gray-100 py-2 md:py-3"
+            className="home-mode-block border-b border-gray-100 py-2 md:py-2"
           >
             <p className={[
-              'leading-snug mb-3 md:mb-4 max-w-xl mx-auto text-center transition-all duration-200',
+              'home-mode-lead leading-snug mb-3 md:mb-3 max-w-xl mx-auto text-center transition-all duration-200',
               isQ0Active || !modeChosen
                 ? 'text-base sm:text-lg font-semibold text-base-text'
                 : 'text-sm sm:text-base font-normal text-base-mute',
@@ -887,10 +887,10 @@ export default function Questionnaire({ onComplete }) {
               </div>
             )}
 
-            <div className="max-w-xl mx-auto flex flex-col gap-2.5">
+            <div className="home-mode-btnrow max-w-xl mx-auto flex flex-col gap-2.5">
               <button
                 className={[
-                  'w-full py-3 rounded-btn border-2 font-semibold text-sm transition-all duration-150 active:scale-[0.98]',
+                  'home-mode-btn w-full py-3 rounded-btn border-2 font-semibold text-sm transition-all duration-150 active:scale-[0.98]',
                   selectedMode === 'single'
                     ? 'border-brand-cyan bg-brand-cyan text-white'
                     : 'border-brand-cyan text-brand-cyan hover:bg-brand-cyan hover:text-white',
@@ -901,7 +901,7 @@ export default function Questionnaire({ onComplete }) {
               </button>
               <button
                 className={[
-                  'w-full py-3 rounded-btn border-2 font-semibold text-sm transition-all duration-150 active:scale-[0.98]',
+                  'home-mode-btn w-full py-3 rounded-btn border-2 font-semibold text-sm transition-all duration-150 active:scale-[0.98]',
                   selectedMode === 'dual'
                     ? 'border-brand-purple bg-brand-purple text-white'
                     : 'border-gray-200 text-base-mute hover:border-brand-purple hover:text-brand-purple',
@@ -915,7 +915,8 @@ export default function Questionnaire({ onComplete }) {
             {!modeChosen && (
               // 移动端隐藏：移动端屏幕小，hero + 三步 + 两个 CTA 已经讲清楚单/双差异；
               // 桌面端 sm 及以上才显示这组双列说明，作为更详尽的补充。
-              <div className="hidden sm:grid max-w-xl mx-auto mt-2.5 md:mt-3 gap-x-6 gap-y-2 text-left sm:grid-cols-2">
+              // 极低高度视口（hxshort）下直接隐藏，优先保证首屏一屏放下、无纵向滚动条。
+              <div className="home-mode-more hidden sm:grid max-w-xl mx-auto mt-2.5 md:mt-2.5 gap-x-6 gap-y-2 text-left sm:grid-cols-2">
                 <div className="relative pl-3 sm:pl-4">
                   <span className="absolute left-0 top-1 h-[calc(100%-0.25rem)] w-[2px] rounded-full bg-brand-cyan/70" aria-hidden />
                   <p className="text-eyebrow mb-1">{QUESTION_MODE_COPY_LOCALIZED.single.badge}</p>

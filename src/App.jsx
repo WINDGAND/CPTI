@@ -321,12 +321,12 @@ export default function App() {
       ) : mainTab === 'help' ? (
         <HelpPage onStartTest={goQuizHome} />
       ) : (
-        <>
-          {/* 紧凑首屏：上下 padding 压缩，让 hero + 三步 + 主 CTA 在常见视口一屏可见。
-              选了模式后用户已经进入滚动答题节奏，紧凑感不会有负面影响。 */}
-          <div className="pt-4 pb-4 text-center md:pt-8 md:pb-6">
-            <p className="text-eyebrow mb-2.5">{t('home.eyebrow')}</p>
-            <h1 className="text-[27px] md:text-[40px] font-extrabold leading-tight mb-3 text-base-text">
+        <div className="home-fill">
+          {/* 首屏：桌面端用 CSS 变量（绑定视口高度）驱动 hero 内边距与标题字号，
+              屏幕越矮越紧凑、越高越舒展，任何桌面高度都能正好铺满一屏、无明显留白、无滚动条。 */}
+          <div className="home-hero-block pt-4 pb-3 text-center">
+            <p className="text-eyebrow mb-2">{t('home.eyebrow')}</p>
+            <h1 className="home-hero-title text-[27px] md:text-[36px] font-extrabold leading-tight mb-2.5 text-base-text">
               <span className="cpti-word font-display" aria-label="CPTI">
                 <span className="cpti-gradient-bg" aria-hidden>
                   {['C', 'P', 'T', 'I'].map((char) => (
@@ -353,10 +353,10 @@ export default function App() {
 
           <HomeStepCards />
 
-          <div className="my-4 border-t border-gray-100 md:my-5" />
+          <div className="home-divider my-3 border-t border-gray-100 md:my-4" />
 
           <Questionnaire onComplete={handleQuizComplete} />
-        </>
+        </div>
       )}
     </AppShell>
   )

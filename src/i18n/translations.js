@@ -273,8 +273,7 @@ const zh = {
     title: '情侣类型',
     listing_empty: '暂无简介',
     slogan: '在 16 种爱情的颜色里，找到属于你们的那一抹光。',
-    card_hint: '测测看',
-    card_aria: '开始测试，看看你们是不是 {title}',
+    card_view_aria: '放大查看 {title} 的配图',
   },
 
   ai: {
@@ -782,8 +781,7 @@ const en = {
     title: 'Couple Types',
     listing_empty: 'No summary yet',
     slogan: 'Among 16 shades of love, find the one that is yours.',
-    card_hint: 'Take the test',
-    card_aria: 'Start the test to see if you are {title}',
+    card_view_aria: 'View the {title} illustration',
   },
 
   ai: {

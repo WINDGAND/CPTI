@@ -7,12 +7,14 @@
   html {
     -webkit-text-size-adjust: 100%;
     scroll-behavior: smooth;
+    /* 任何横向溢出都在根级裁断，防止移动端浏览器检测到溢出后自动缩放整页 */
+    overflow-x: clip;
   }
 
   body {
     @apply bg-base-bg font-sans text-base-text antialiased;
     min-height: 100dvh;
-    overflow-x: hidden;
+    overflow-x: clip;
   }
 
   *, *::before, *::after {
@@ -90,12 +92,18 @@
     --poster-bg:     #F0FBF5;
   }
 
-  /* 结果页 Hero：突破 main 内边距，全宽色带 + 底边斜切 */
+  /*
+   * 结果页 Hero：突破 main 内边距，全宽色带 + 底边斜切。
+   * 注意：100vw 在桌面端包含纵向滚动条宽度，会把页面撑出横向溢出；
+   * 移动端 Safari/Chrome 一旦检测到横向溢出会自动缩放整页（内容缩到角落）。
+   * 因此用 100% + 负 margin 抵消父级 padding 的方式实现全宽，
+   * 宽度永远不超过布局视口。
+   */
   .cpti-result-hero-bleed {
-    width: 100vw;
-    max-width: 100vw;
-    margin-left: calc(50% - 50vw);
-    margin-right: calc(50% - 50vw);
+    width: auto;
+    max-width: none;
+    margin-left: calc(-1 * (100vw - 100%) / 2);
+    margin-right: calc(-1 * (100vw - 100%) / 2);
     clip-path: polygon(0 0, 100% 0, 100% calc(100% - 1.25rem), 0 100%);
     padding-bottom: 2rem;
   }
@@ -430,6 +438,67 @@
   .marquee-mask {
     -webkit-mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
             mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+  }
+
+  /*
+   * 首屏自适应铺满（桌面端）：用一组随视口高度 dvh 平滑伸缩的 CSS 变量
+   * 驱动关键元素的字号/图高/间距。屏幕越矮元素越小、越高越大，
+   * 使首屏在常见桌面高度区间内自然铺满整屏、无明显留白、不溢出滚动条。
+   * 移动端（<768px）不启用，保持原有固定排版。
+   */
+  @media (min-width: 768px) {
+    :root {
+      /* 主标题字号：视口 640px→29px，1080px→44px */
+      --home-title: clamp(29px, 3.41dvh + 7.2px, 44px);
+      /* 配图高度：视口 640px→58px，1080px→120px */
+      --home-img-h: clamp(58px, 14.1dvh - 32.2px, 120px);
+      /* 各区块纵向间距 */
+      --home-hero-py: clamp(6px, 1.5dvh, 24px);
+      --home-marquee-mt: clamp(6px, 1.6dvh, 20px);
+      --home-gap: clamp(8px, 1.3dvh, 18px);
+      /* 步骤卡编号字号：视口 640px→20px，1080px→34px */
+      --home-step-num: clamp(20px, 3.18dvh - 0.4px, 34px);
+      /* 模式选择区：引导语下距、按钮内边距、补充说明上距 */
+      --home-mode-py: clamp(4px, 1.1dvh, 12px);
+      --home-mode-lead-mb: clamp(6px, 1.4dvh, 16px);
+      --home-btn-py: clamp(7px, 1.2dvh + 1px, 14px);
+      --home-mode-gap: clamp(6px, 1.1dvh, 12px);
+      --home-more-mt: clamp(5px, 1.3dvh, 14px);
+    }
+    /* 用 !important 压过同优先级的 md:/sm: 原子类，确保变量尺寸生效 */
+    .home-hero-title { font-size: var(--home-title) !important; }
+    .home-marquee-img { height: var(--home-img-h) !important; width: auto !important; }
+    .home-hero-block { padding-top: var(--home-hero-py) !important; padding-bottom: var(--home-hero-py) !important; }
+    .home-marquee { margin-top: var(--home-marquee-mt) !important; }
+    .home-divider { margin-top: var(--home-gap) !important; margin-bottom: var(--home-gap) !important; }
+    /* 步骤卡与模式选择区同样随视口高度伸缩 */
+    .home-step-num { font-size: var(--home-step-num) !important; }
+    .home-mode-block { padding-top: var(--home-mode-py) !important; padding-bottom: var(--home-mode-py) !important; }
+    .home-mode-lead { margin-bottom: var(--home-mode-lead-mb) !important; }
+    .home-mode-btn { padding-top: var(--home-btn-py) !important; padding-bottom: var(--home-btn-py) !important; }
+    .home-mode-btnrow { gap: var(--home-mode-gap) !important; }
+    .home-mode-more { margin-top: var(--home-more-mt) !important; }
+
+    /*
+     * 弹性撑满：首屏容器至少占满「视口高 − 顶栏」，三块内容用 auto margin
+     * 把多余空间均匀分到彼此的间隔里（首尾贴边、间隙均分），
+     * 这样无论视口多高都能铺满整屏、且不会在底部留下一大片空白。
+     */
+    /* 顶栏(76) + main 顶/底 padding(24+24)：容器铺满视口且不撑出滚动条 */
+    .home-fill {
+      display: flex;
+      flex-direction: column;
+      min-height: calc(100dvh - 76px - 48px);
+    }
+    .home-fill > * { flex: 0 0 auto; }
+    .home-fill > .home-steps { margin-top: auto; }
+    .home-fill > .home-divider { margin-top: auto; margin-bottom: auto; }
+    .home-fill > .home-quiz { margin-top: auto; }
+  }
+
+  /* 极矮桌面视口（宽≥768 且 高≤700px）：模式补充说明直接隐藏，优先保证一屏放下 */
+  @media (min-width: 768px) and (max-height: 700px) {
+    .home-mode-more { display: none !important; }
   }
 
   /* ── Likert 选中的 ripple 水波（外层 absolute 圆环散开 350ms）── */
