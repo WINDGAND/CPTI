@@ -1,5 +1,6 @@
-import { ArrowRight, BookOpenText, Compass, HeartHandshake, ShieldCheck } from 'lucide-react'
+import { ArrowRight, BookOpenText, Compass, Github, HeartHandshake, ShieldCheck } from 'lucide-react'
 import { useLanguage } from '../../i18n/LanguageContext'
+import { GITHUB_REPO_URL } from '../../utils/site'
 
 function getDimensions(t) {
   return [
@@ -158,6 +159,17 @@ export default function AboutPage({ onStartTest, onGoFAQ }) {
           {t('help.about_footer_text')}
         </p>
         <PrimaryButton onClick={onStartTest}>{t('common.start_test')}</PrimaryButton>
+        <div className="mt-6">
+          <a
+            href={GITHUB_REPO_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-[13px] text-base-mute transition-colors hover:text-brand-cyan"
+          >
+            <Github size={14} aria-hidden />
+            {t('help.about_github_link')}
+          </a>
+        </div>
       </footer>
     </div>
   )

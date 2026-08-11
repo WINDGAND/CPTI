@@ -65,6 +65,7 @@ const zh = {
     feedback: '反馈',
     open_feedback: '问题反馈',
     back_to_home: '返回首页',
+    github: 'GitHub 仓库',
   },
 
   home: {
@@ -486,6 +487,7 @@ const zh = {
     discl_feedback_value: '内测通道',
 
     about_footer_text: '如果你准备好了，最好的理解方式不是"继续看说明"，而是亲自完成一次测试。',
+    about_github_link: '在 GitHub 上查看源码',
 
     macro_title: '理解 CPTI（宏观）',
     macro_desc: '先理解这套模型在测什么，再看结果会更有方向感。',
@@ -569,6 +571,7 @@ const en = {
     feedback: 'Feedback',
     open_feedback: 'Send feedback',
     back_to_home: 'Back to home',
+    github: 'GitHub repository',
   },
 
   home: {
@@ -985,6 +988,7 @@ const en = {
     discl_feedback_value: 'Beta channel',
 
     about_footer_text: 'If you are ready, the best way to understand it is to take the test once yourself.',
+    about_github_link: 'View the source on GitHub',
 
     macro_title: 'Understanding CPTI (concept)',
     macro_desc: 'Understanding what the model measures gives the result clearer direction.',

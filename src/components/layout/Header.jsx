@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
-import { BarChart3, CircleHelp, HeartHandshake, Home, MessageCircleHeart, MessageSquarePlus } from 'lucide-react'
+import { BarChart3, CircleHelp, Github, HeartHandshake, Home, MessageCircleHeart, MessageSquarePlus } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useFeedback } from '../feedback/FeedbackContext'
 import { useLanguage } from '../../i18n/LanguageContext'
 import { useLocalizedResults, useLocalizedTypeGroupMeta } from '../../i18n/useLocalizedData'
+import { GITHUB_REPO_URL } from '../../utils/site'
 import LanguageSwitcher from './LanguageSwitcher'
 
 const NAV_ITEM_DEFS = [
@@ -222,7 +223,7 @@ export default function Header({
             })}
           </nav>
 
-          {/* ── 右上角：语言切换器 + 反馈 ────────────────────────── */}
+          {/* ── 右上角：语言切换器 + 反馈 + GitHub ─────────────────── */}
           <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2 -mr-2 sm:-mr-3">
             <LanguageSwitcher />
             <button
@@ -237,6 +238,21 @@ export default function Header({
               <MessageSquarePlus size={17} aria-hidden />
               <span className="hidden sm:inline text-[14px] font-medium leading-none">{t('nav.feedback')}</span>
             </button>
+            {/* GitHub 仓库入口：移动端顶部空间紧张（Logo 文字不可压缩），仅在 sm+ 显示，
+                移动端用户由关于页页脚的入口兜底 */}
+            <a
+              href={GITHUB_REPO_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={[
+                'hidden sm:inline-flex shrink-0 items-center justify-center h-12 w-12 rounded-full',
+                'text-base-mute transition-colors hover:text-brand-cyan hover:bg-black/[0.035]',
+              ].join(' ')}
+              aria-label={t('nav.github')}
+              title={t('nav.github')}
+            >
+              <Github size={17} aria-hidden />
+            </a>
           </div>
         </div>
       </div>
