@@ -10,6 +10,7 @@ import {
   Compass,
   MessageCircleHeart,
   Sparkles,
+  UserPlus,
 } from 'lucide-react'
 import { DIMENSION_DETAILS, getResultByCode } from '../utils/scoring'
 import { createDualInviteLink, createSingleShareLink, INVITE_SCHEMA_VERSION } from '../utils/inviteCodec'
@@ -30,6 +31,22 @@ import { useLocalizedResultByCode } from '../i18n/useLocalizedData'
  */
 
 const DIMENSION_ROWS = Object.values(DIMENSION_DETAILS)
+
+/** 关系光谱四维专属色：空间=蜜桃粉 / 表达=湖水蓝 / 节奏=罗兰紫 / 冲突=薄荷绿（呼应品牌四色） */
+const DIMENSION_COLORS = {
+  SI: '#F4A7B0',
+  RP: '#76B8E0',
+  OF: '#B8A0D0',
+  DA: '#33a474',
+}
+
+/** 分区滚动入场：内容块进入视口时轻柔上浮（与结果页既有 stagger 曲线一致） */
+const sectionReveal = {
+  initial: { opacity: 0, y: 18 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true, amount: 0.2 },
+  transition: { duration: 0.5, ease: [0.16, 0.84, 0.34, 1] },
+}
 
 /** 统一分区头：编号圈 + 标题 + 主题色细线 */
 function SectionHeader({ num, title }) {
@@ -73,20 +90,28 @@ function renderSpectrum(percentages, t) {
         const { posKey, negKey, posLabel, negLabel, title } = getLocalizedDim(t, row)
         const posVal = percentages[posKey] ?? 50
         const negVal = percentages[negKey] ?? 50
+        const dimColor = DIMENSION_COLORS[`${row.posKey}${row.negKey}`]
         return (
           <div key={posKey} className="space-y-1">
-            <div className="text-[11px] text-base-mute font-medium">{title}</div>
+            <div className="flex items-center gap-1.5 text-[11px] font-medium text-base-mute">
+              <span
+                className="h-2 w-2 rounded-full shrink-0"
+                style={{ backgroundColor: dimColor }}
+                aria-hidden
+              />
+              {title}
+            </div>
             <div className="flex items-center gap-1.5 sm:gap-2">
               <span
                 className="text-xs font-semibold w-10 sm:w-12 text-right shrink-0"
-                style={{ color: 'var(--poster-accent)' }}
+                style={{ color: dimColor }}
               >
                 {posLabel}
               </span>
               <div className="flex-1 h-2 rounded-full bg-gray-100 overflow-hidden min-w-0">
                 <motion.div
                   className="h-full rounded-full"
-                  style={{ backgroundColor: 'var(--poster-accent)' }}
+                  style={{ backgroundColor: dimColor }}
                   initial={{ width: 0 }}
                   animate={{ width: `${posVal}%` }}
                   transition={{ duration: 0.8, ease: 'easeOut', delay: 0.1 }}
@@ -383,7 +408,7 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
             <div className="lg:col-span-8 order-1">
               <SectionHeader num="①" title={t('result.section_profile')} />
 
-              <div className="rounded-xl border border-gray-100 bg-gray-50/90 px-4 py-3 text-left mb-5">
+              <motion.div {...sectionReveal} className="rounded-xl border border-gray-100 bg-gray-50/90 px-4 py-3 text-left mb-5">
                 <p className="text-xs font-semibold text-base-text">
                   {isDualMode ? t('result.intro_dual_title') : t('result.intro_single_title')}
                 </p>
@@ -392,30 +417,30 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
                     ? t('result.intro_dual_fallback')
                     : t('result.intro_single_fallback'))}
                 </p>
-              </div>
+              </motion.div>
 
-              <div className="result-list text-left">
+              <motion.div {...sectionReveal} className="result-list text-left">
                 {result.description.map((line, i) => (
                   <p key={i} className="result-prose">
                     {line}
                   </p>
                 ))}
-              </div>
+              </motion.div>
 
               <Divider />
             </div>
 
-            <aside className="lg:col-span-4 order-2 lg:sticky lg:top-24 lg:self-start mb-8 lg:mb-0 rounded-xl border border-gray-100/80 bg-base-card/80 p-4 md:p-5 shadow-sm backdrop-blur-sm">
+            <motion.aside {...sectionReveal} className="lg:col-span-4 order-2 lg:sticky lg:top-24 lg:self-start mb-8 lg:mb-0 rounded-xl border border-gray-100/80 bg-base-card/80 p-4 md:p-5 shadow-sm backdrop-blur-sm">
               <SectionHeader num="②" title={isDualMode ? t('result.section_spectrum_dual') : t('result.section_spectrum_single')} />
               {renderSpectrum(percentages, t)}
-            </aside>
+            </motion.aside>
 
             <div className="lg:col-span-8 order-3 space-y-0 lg:col-start-1">
         {isDualMode && (
           <>
             <Divider />
             <SectionHeader num="③" title={t('result.section_alignment')} />
-            <div className="result-list">
+            <motion.div {...sectionReveal} className="result-list">
               <div className="rounded-xl border border-green-100 bg-green-50/60 p-4">
                 <div className="mb-3 flex items-center gap-2">
                   <Sparkles size={14} className="text-green-600" />
@@ -452,11 +477,11 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
                   {differenceHint ?? t('result.misaligned_fallback')}
                 </p>
               </div>
-            </div>
+            </motion.div>
 
             <Divider />
             <SectionHeader num="④" title={t('result.section_perspectives')} />
-            <div className="result-list">
+            <motion.div {...sectionReveal} className="result-list">
               {resultData.players.map((player, idx) => (
                 <div key={player.id} className="rounded-xl border border-gray-100 bg-white/90 p-4">
                   <p className="text-xs font-semibold text-base-mute">{t('result.perspective_player_n', { n: idx + 1 })}</p>
@@ -469,7 +494,7 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
                   </div>
                 </div>
               ))}
-            </div>
+            </motion.div>
           </>
         )}
 
@@ -478,13 +503,14 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
         {/* ── ③/⑤ 关系优势 ────────────────────────────── */}
         <SectionHeader num={isDualMode ? '⑤' : '③'} title={t('result.section_strengths')} />
 
-        <div className="result-list">
+        <motion.div {...sectionReveal} className="result-list">
           {result.strengths.map(({ title, desc }, i) => (
             <motion.div
               key={i}
               className="flex gap-3"
               initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
               transition={{ delay: i * 0.08, duration: 0.3 }}
             >
               <CheckCircle2 size={18} className="shrink-0 mt-1" style={{ color: 'var(--poster-accent)' }} />
@@ -494,20 +520,21 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
               </div>
             </motion.div>
           ))}
-        </div>
+        </motion.div>
 
         <Divider />
 
         {/* ── ④/⑥ 关系挑战 ────────────────────────────── */}
         <SectionHeader num={isDualMode ? '⑥' : '④'} title={t('result.section_challenges')} />
 
-        <div className="result-list">
+        <motion.div {...sectionReveal} className="result-list">
           {result.challenges.map(({ title, desc }, i) => (
             <motion.div
               key={i}
               className="flex gap-3"
               initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
               transition={{ delay: i * 0.08, duration: 0.3 }}
             >
               <AlertCircle size={18} className="shrink-0 mt-1 text-amber-400" />
@@ -517,14 +544,14 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
               </div>
             </motion.div>
           ))}
-        </div>
+        </motion.div>
 
         <Divider />
 
         {/* ── ⑤/⑦ 冲突模式 ────────────────────────────── */}
         <SectionHeader num={isDualMode ? '⑦' : '⑤'} title={t('result.section_conflict')} />
 
-        <div className="result-list">
+        <motion.div {...sectionReveal} className="result-list">
           {/* 触发模式 */}
           <div
             className="rounded-xl p-4 space-y-2"
@@ -553,14 +580,14 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
               {result.conflictPattern.resolution}
             </p>
           </div>
-        </div>
+        </motion.div>
 
         <Divider />
 
         {/* ── ⑥/⑧ 充电 vs 耗电 ──────────────────────── */}
         <SectionHeader num={isDualMode ? '⑧' : '⑥'} title={t('result.section_energy')} />
 
-        <div className="space-y-4">
+        <motion.div {...sectionReveal} className="space-y-4">
           {/* 充电 */}
           <div>
             <div className="flex items-center gap-2 mb-3">
@@ -606,14 +633,15 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
               ))}
             </div>
           </div>
-        </div>
+        </motion.div>
 
         <Divider />
 
         {/* ── ⑦/⑨ 长期走向 ───────────────────────────── */}
         <SectionHeader num={isDualMode ? '⑨' : '⑦'} title={t('result.section_longterm')} />
 
-        <div
+        <motion.div
+          {...sectionReveal}
           className="rounded-xl p-4"
           style={{ backgroundColor: 'color-mix(in srgb, var(--poster-accent) 8%, white)' }}
         >
@@ -622,14 +650,14 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
             <span className="text-xs font-semibold text-base-mute">{t('result.longterm_subhead')}</span>
           </div>
           <p className="result-prose">{result.longterm}</p>
-        </div>
+        </motion.div>
 
         <Divider />
 
         {/* ── ⑧/⑩ 相处 Tips ──────────────────────────── */}
         <SectionHeader num={isDualMode ? '⑩' : '⑧'} title={t('result.section_tips')} />
 
-        <div className="result-list">
+        <motion.div {...sectionReveal} className="result-list">
           {result.tipsForCouple.map((tip, i) => (
             <div key={i} className="flex gap-3 items-start">
               <div
@@ -641,14 +669,14 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
               <p className="result-prose">{tip}</p>
             </div>
           ))}
-        </div>
+        </motion.div>
 
         <Divider />
 
         {/* ── 趣味数据 ──────────────────────────────── */}
         <SectionHeader num="📊" title={isDualMode ? t('result.section_data_dual') : t('result.section_data_single')} />
 
-        <div className="grid grid-cols-2 gap-2">
+        <motion.div {...sectionReveal} className="grid grid-cols-2 gap-2">
           {result.funFacts.map(({ label, value }) => (
             <div
               key={label}
@@ -657,21 +685,21 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
             >
               <p className="text-[10px] text-base-mute truncate">{label}</p>
               <p
-                className="text-xs sm:text-sm font-bold leading-snug break-words"
+                className="font-display tabular-nums text-sm sm:text-base font-bold leading-snug break-words"
                 style={{ color: 'var(--poster-accent)' }}
               >
                 {value}
               </p>
             </div>
           ))}
-        </div>
+        </motion.div>
 
         <Divider />
 
         {/* ── 关系星盘 ──────────────────────────────── */}
         <SectionHeader num="✨" title={t('result.section_star')} />
 
-        <div className="flex gap-2 sm:gap-3">
+        <motion.div {...sectionReveal} className="flex gap-2 sm:gap-3">
           <div className="flex-1 min-w-0 rounded-xl p-2.5 sm:p-3 border border-green-100 bg-green-50/50">
             <p className="text-[10px] text-green-600 font-semibold mb-1">{t('result.star_soulmate')}</p>
             <p className="text-xs sm:text-sm font-bold text-base-text leading-snug break-words">
@@ -686,7 +714,7 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
             </p>
             <p className="text-[10px] text-base-mute mt-0.5">{result.nemesis}</p>
           </div>
-        </div>
+        </motion.div>
 
         {/* 底部水印 */}
         <div className="pt-8 text-center">
@@ -707,7 +735,81 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
 
       <div className="my-8 h-px bg-gray-200" />
 
-      {/* 1. 昵称 + 生成报告 */}
+      {/* 1. 邀请 TA / 分享链接（单人模式）：裂变主路径，放在昵称之前 */}
+      {!isDualMode && (
+        <>
+          <div className="overflow-hidden rounded-[24px] border border-gray-100 bg-white shadow-card">
+            <div className="bg-gradient-to-r from-brand-purple/10 via-white to-white p-4 sm:p-5">
+              <div className="flex items-start gap-3">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-purple text-white shadow-sm">
+                  <UserPlus size={21} aria-hidden />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-base-text">{t('result.invite_section_title')}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-base-mute">
+                    {t('result.invite_section_desc')}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                <button
+                  type="button"
+                  className={[
+                    'flex-1 py-3 rounded-btn text-sm font-semibold transition-all duration-150',
+                    shareCopied
+                      ? 'bg-brand-green text-white border border-brand-green shadow-sm'
+                      : 'btn-ghost',
+                  ].join(' ')}
+                  onClick={handleCopySingleShareLink}
+                >
+                  {shareCopied ? t('result.invite_copy_single_done') : t('result.invite_copy_single')}
+                </button>
+                <button
+                  type="button"
+                  className={[
+                    'flex-1 py-3 rounded-btn text-sm font-semibold transition-all duration-150',
+                    inviteCopied
+                      ? 'bg-brand-green text-white border border-brand-green shadow-sm'
+                      : 'btn-primary',
+                  ].join(' ')}
+                  onClick={handleCopySingleInvite}
+                  disabled={singleInviteLoading}
+                >
+                  {singleInviteLoading
+                    ? t('result.invite_copy_dual_loading')
+                    : inviteCopied
+                      ? t('result.invite_copy_dual_done')
+                      : t('result.invite_copy_dual')}
+                </button>
+                {singleInviteLink && (
+                  <a
+                    className="btn-ghost flex-1 py-3 text-center"
+                    href={singleInviteLink}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {t('result.invite_preview_link')}
+                  </a>
+                )}
+              </div>
+              {singleInviteError && (
+                <p className="mt-2 text-xs text-rose-600">{singleInviteError}</p>
+              )}
+              <p className="mt-2 text-xs text-green-600 min-h-[1.25rem]">
+                {inviteCopied
+                  ? t('result.invite_copy_dual_done_tip')
+                  : shareCopied
+                    ? t('result.invite_copy_single_done_tip')
+                    : ' '}
+              </p>
+            </div>
+          </div>
+
+          <div className="my-8 h-px bg-gray-200" />
+        </>
+      )}
+
+      {/* 2. 昵称 + 生成报告 */}
       <div className="space-y-3">
         <div>
           <p className="text-sm font-semibold text-base-text">
@@ -762,70 +864,6 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
           </button>
         )}
       </div>
-
-      {/* 2. 邀请 TA / 分享链接（单人模式） */}
-      {!isDualMode && (
-        <>
-          <div className="my-8 h-px bg-gray-200" />
-          <div className="rounded-card border border-brand-purple/15 bg-brand-purple/5 p-4">
-            <p className="text-sm font-semibold text-base-text">{t('result.invite_section_title')}</p>
-            <p className="mt-1 text-xs leading-relaxed text-base-mute">
-              {t('result.invite_section_desc')}
-            </p>
-            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-              <button
-                type="button"
-                className={[
-                  'flex-1 py-3 rounded-btn text-sm font-semibold transition-all duration-150',
-                  shareCopied
-                    ? 'bg-brand-green text-white border border-brand-green shadow-sm'
-                    : 'btn-ghost',
-                ].join(' ')}
-                onClick={handleCopySingleShareLink}
-              >
-                {shareCopied ? t('result.invite_copy_single_done') : t('result.invite_copy_single')}
-              </button>
-              <button
-                type="button"
-                className={[
-                  'flex-1 py-3 rounded-btn text-sm font-semibold transition-all duration-150',
-                  inviteCopied
-                    ? 'bg-brand-green text-white border border-brand-green shadow-sm'
-                    : 'btn-primary',
-                ].join(' ')}
-                onClick={handleCopySingleInvite}
-                disabled={singleInviteLoading}
-              >
-                {singleInviteLoading
-                  ? t('result.invite_copy_dual_loading')
-                  : inviteCopied
-                    ? t('result.invite_copy_dual_done')
-                    : t('result.invite_copy_dual')}
-              </button>
-              {singleInviteLink && (
-                <a
-                  className="btn-ghost flex-1 py-3 text-center"
-                  href={singleInviteLink}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {t('result.invite_preview_link')}
-                </a>
-              )}
-            </div>
-            {singleInviteError && (
-              <p className="mt-2 text-xs text-rose-600">{singleInviteError}</p>
-            )}
-            <p className="mt-2 text-xs text-green-600 min-h-[1.25rem]">
-              {inviteCopied
-                ? t('result.invite_copy_dual_done_tip')
-                : shareCopied
-                  ? t('result.invite_copy_single_done_tip')
-                  : ' '}
-            </p>
-          </div>
-        </>
-      )}
 
       {/* 3. AI 关系助手 */}
       <div className="my-8 h-px bg-gray-200" />
