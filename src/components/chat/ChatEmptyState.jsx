@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion'
 import { ArrowUpRight, Compass, Flame, HeartHandshake, MessageCircleHeart } from 'lucide-react'
 import { useLanguage } from '../../i18n/LanguageContext'
 
@@ -58,18 +59,51 @@ export default function ChatEmptyState({ context, disabled = false, onPick }) {
 
   return (
     <div className="mx-auto w-full max-w-4xl px-1 pt-6 pb-2 md:pt-10">
-      {/* 极简引导：仅保留一句核心提问 */}
-      <h2 className="mb-6 text-[20px] font-extrabold leading-tight text-base-text md:mb-9 md:text-[26px]">
-        {t('chat.empty_title_lead')}<span className="text-base-mute">{t('chat.empty_title_rest')}</span>
-      </h2>
+      {/* 顶部四色散点：空状态的视觉记忆点，呼应四色光谱 */}
+      <motion.div
+        className="mb-5 flex items-center justify-center gap-2.5 md:mb-7"
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.4, ease: [0.16, 0.84, 0.34, 1] }}
+        aria-hidden
+      >
+        {SCENE_PALETTE.map((p, i) => (
+          <motion.span
+            key={p.id}
+            className="h-2 w-2 rounded-full"
+            style={{ backgroundColor: p.accent, boxShadow: `0 0 10px ${p.accent}80` }}
+            animate={{ y: [0, -4, 0] }}
+            transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut', delay: i * 0.22 }}
+          />
+        ))}
+      </motion.div>
+
+      {/* 极简引导：仅保留一句核心提问，后半句用光谱渐变点亮 */}
+      <motion.h2
+        className="mb-6 text-center text-[20px] font-extrabold leading-tight text-base-text md:mb-9 md:text-[26px]"
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: [0.16, 0.84, 0.34, 1] }}
+      >
+        {t('chat.empty_title_lead')}
+        <span
+          className="bg-clip-text text-transparent"
+          style={{ backgroundImage: 'linear-gradient(90deg, #F4A7B0, #76B8E0, #B8A0D0, #8ED6B4)' }}
+        >
+          {t('chat.empty_title_rest')}
+        </span>
+      </motion.h2>
 
       {/* 4 场景 — 桌面端 4 列，平板 2 列，移动 1 列；hairline 分隔，去卡片 */}
       <div className="grid grid-cols-1 gap-x-7 gap-y-5 sm:grid-cols-2 lg:grid-cols-4 lg:divide-x lg:divide-gray-100/80">
         {scenes.map((scene, idx) => {
           const Icon = scene.icon
           return (
-            <section
+            <motion.section
               key={scene.id}
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, ease: [0.16, 0.84, 0.34, 1], delay: 0.15 + idx * 0.07 }}
               className={[
                 'relative min-w-0',
                 idx > 0 ? 'sm:pt-0 lg:pl-6' : 'lg:pr-2',
@@ -110,7 +144,7 @@ export default function ChatEmptyState({ context, disabled = false, onPick }) {
                   </li>
                 ))}
               </ul>
-            </section>
+            </motion.section>
           )
         })}
       </div>

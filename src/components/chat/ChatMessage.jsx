@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { motion } from 'framer-motion'
 import { Check, Copy, Pencil, Quote, RotateCcw, Trash2 } from 'lucide-react'
 import AiMessageContent from './AiMessageContent'
 import { useLanguage } from '../../i18n/LanguageContext'
@@ -135,12 +136,20 @@ export default function ChatMessage({
     }
   }
 
+  // 用户气泡跟随结果主题色（--poster-accent 由壳层 themeClass 注入），不再是写死的工具青
+  const userBubbleStyle = {
+    backgroundColor: 'var(--poster-accent, #4298b4)',
+    boxShadow: '0 6px 18px -10px color-mix(in srgb, var(--poster-accent, #4298b4) 55%, transparent)',
+  }
   const bubbleColor = isUser
-    ? 'bg-brand-cyan text-white shadow-[0_6px_18px_-10px_rgba(66,152,180,0.55)]'
+    ? 'text-white'
     : 'bg-white text-base-text border border-gray-100 shadow-[0_2px_10px_-6px_rgba(15,23,42,0.10)]'
 
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.28, ease: [0.16, 0.84, 0.34, 1] }}
       className={[
         'group/msg relative flex w-full gap-2.5 transition-colors',
         isUser ? 'flex-row-reverse' : 'flex-row',
@@ -170,7 +179,13 @@ export default function ChatMessage({
 
       {/* AI 侧的"AI"圆点 avatar — 仅在非选择模式下且为助手消息时显示 */}
       {!isUser && !selectionMode && (
-        <div className="mt-1 hidden sm:flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-cyan/10 text-brand-cyan">
+        <div
+          className="mt-1 hidden sm:flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
+          style={{
+            backgroundColor: 'color-mix(in srgb, var(--poster-accent, #4298b4) 12%, transparent)',
+            color: 'var(--poster-accent, #4298b4)',
+          }}
+        >
           <span className="text-[10px] font-bold leading-none">AI</span>
         </div>
       )}
@@ -182,6 +197,7 @@ export default function ChatMessage({
             bubbleColor,
             isUser ? 'rounded-tr-md' : 'rounded-tl-md',
           ].join(' ')}
+          style={isUser ? userBubbleStyle : undefined}
         >
           {/* AI 消息左侧主题色锚条 */}
           {!isUser && (
@@ -237,12 +253,12 @@ export default function ChatMessage({
                   ? <AiMessageContent content={message.content} />
                   : isStreaming
                     ? <span className="inline-flex items-center gap-1 text-base-mute">
-                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand-cyan" />
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full" style={{ backgroundColor: 'var(--poster-accent, #4298b4)' }} />
                         <span className="text-xs">{t('chat.typing')}</span>
                       </span>
                     : null}
                 {isStreaming && message.content && (
-                  <span className="ml-1 inline-block h-4 w-0.5 animate-pulse bg-brand-cyan align-middle" aria-hidden />
+                  <span className="ml-1 inline-block h-4 w-0.5 animate-pulse align-middle" style={{ backgroundColor: 'var(--poster-accent, #4298b4)' }} aria-hidden />
                 )}
               </>
             )}
@@ -335,6 +351,6 @@ export default function ChatMessage({
           </div>
         )}
       </div>
-    </div>
+    </motion.div>
   )
 }

@@ -1,5 +1,9 @@
+import { motion } from 'framer-motion'
 import { ArrowRight, MessageCircleHeart, Sparkles } from 'lucide-react'
 import { useLanguage } from '../../i18n/LanguageContext'
+
+// 恋爱四色（替代原 MBTI 工具色序号），与空状态/分享海报同一套光谱语言
+const FEATURE_ACCENTS = ['#F4A7B0', '#76B8E0', '#B8A0D0']
 
 export default function AiUnlockPage({ onStartTest }) {
   const { t } = useLanguage()
@@ -31,7 +35,13 @@ export default function AiUnlockPage({ onStartTest }) {
               style={{ background: 'linear-gradient(90deg, #F4A7B0, #76B8E0, #B8A0D0, #8ED6B4)' }}
               aria-hidden
             />
-            <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white text-brand-cyan shadow-[0_8px_30px_-12px_rgba(66,152,180,0.6)] ring-1 ring-brand-cyan/15">
+            <span
+              className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-[0_8px_30px_-12px_rgba(118,184,224,0.6)]"
+              style={{
+                color: '#76B8E0',
+                boxShadow: '0 8px 30px -12px rgba(118,184,224,0.6), inset 0 0 0 1px color-mix(in srgb, #76B8E0 22%, transparent)',
+              }}
+            >
               <MessageCircleHeart size={24} aria-hidden />
             </span>
           </div>
@@ -41,22 +51,39 @@ export default function AiUnlockPage({ onStartTest }) {
             {t('ai.eyebrow')}
           </p>
 
-          <h1 className="mt-3 font-extrabold leading-tight text-base-text text-2xl md:text-[34px]">
+          <motion.h1
+            className="mt-3 font-extrabold leading-tight text-base-text text-2xl md:text-[34px]"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: [0.16, 0.84, 0.34, 1] }}
+          >
             {t('ai.title')}
-          </h1>
+          </motion.h1>
 
-          <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-base-mute">
+          <motion.p
+            className="mx-auto mt-4 max-w-xl text-sm leading-7 text-base-mute"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, duration: 0.4, ease: [0.16, 0.84, 0.34, 1] }}
+          >
             {t('ai.desc')}
-          </p>
+          </motion.p>
 
-          <button
+          <motion.button
             type="button"
             onClick={onStartTest}
-            className="mt-7 inline-flex items-center justify-center gap-2 rounded-full bg-brand-cyan px-7 py-3 text-sm font-semibold text-white shadow-[0_12px_30px_-12px_rgba(66,152,180,0.7)] transition-all duration-200 hover:opacity-95 hover:-translate-y-0.5 active:scale-[0.98]"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.4, ease: [0.16, 0.84, 0.34, 1] }}
+            className="mt-7 inline-flex items-center justify-center gap-2 rounded-full px-7 py-3 text-sm font-semibold text-white transition-all duration-200 hover:opacity-95 hover:-translate-y-0.5 active:scale-[0.98]"
+            style={{
+              background: 'linear-gradient(90deg, #F4A7B0, #76B8E0, #B8A0D0, #8ED6B4)',
+              boxShadow: '0 12px 30px -12px rgba(118,184,224,0.7)',
+            }}
           >
             {t('ai.cta')}
             <ArrowRight className="h-4 w-4 shrink-0" strokeWidth={2.5} aria-hidden />
-          </button>
+          </motion.button>
         </div>
       </section>
 
@@ -65,8 +92,12 @@ export default function AiUnlockPage({ onStartTest }) {
         <p className="text-eyebrow-mute mb-5 px-0.5">{t('ai.why_eyebrow')}</p>
         <div className="grid grid-cols-1 gap-x-10 gap-y-6 md:grid-cols-3 md:divide-x md:divide-gray-100">
           {FEATURES.map(([num, title, desc], idx) => (
-            <article
+            <motion.article
               key={title}
+              initial={{ opacity: 0, y: 14 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.4 }}
+              transition={{ duration: 0.4, ease: [0.16, 0.84, 0.34, 1], delay: idx * 0.08 }}
               className={[
                 'relative',
                 idx > 0 ? 'pt-6 border-t border-gray-100 md:pt-0 md:border-t-0 md:pl-8' : 'md:pr-8',
@@ -74,13 +105,13 @@ export default function AiUnlockPage({ onStartTest }) {
             >
               <span
                 className="ed-numeral text-3xl md:text-4xl"
-                style={{ color: idx === 0 ? '#4298b4' : idx === 1 ? '#33a474' : '#88619a' }}
+                style={{ color: FEATURE_ACCENTS[idx % FEATURE_ACCENTS.length] }}
               >
                 {num}
               </span>
               <h2 className="mt-2 text-sm font-bold text-base-text">{title}</h2>
               <p className="mt-1.5 text-xs leading-6 text-base-mute">{desc}</p>
-            </article>
+            </motion.article>
           ))}
         </div>
       </section>
