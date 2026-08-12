@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
-import { TYPE_CODES, getTypeImageSrc } from '../../data/typeImages'
+import { TYPE_CODES, getTypeThumbSources } from '../../data/typeImages'
 import { useLanguage } from '../../i18n/LanguageContext'
 
 /**
@@ -9,10 +10,51 @@ import { useLanguage } from '../../i18n/LanguageContext'
  *   四色光谱细带 → 16 型配图无限横滚（按四色系排序）→ 行动文案
  *
  * 性能与无障碍：
- * - 单张 webp 均 < 40KB，懒加载 + 懒解码，跑马灯仅平移 transform（GPU 合成层）
- * - 重复序列 aria-hidden，整组对外暴露为一个语义链接
+ * - 使用 256x256 跑马灯专用缩略图（单张 webp < 10KB，全量约 110KB），首屏直接加载
+ * - 加载中与加载失败都落在色系渐变占位上，onError 走 webp → png → 占位 兜底链，
+ *   任何网络状况下都不会露出浏览器破图
+ * - 跑马灯仅平移 transform（GPU 合成层）；重复序列 aria-hidden
  * - prefers-reduced-motion：停止横滚与光带流动，呈现静态序列
  */
+
+// 四色系占位渐变，与 spectrum-ribbon 的品牌四色一致
+const FAMILY_PLACEHOLDER = {
+  SR: 'from-[#F4A7B0]/35 to-[#F4A7B0]/70',
+  SP: 'from-[#76B8E0]/35 to-[#76B8E0]/70',
+  IR: 'from-[#B8A0D0]/35 to-[#B8A0D0]/70',
+  IP: 'from-[#8ED6B4]/35 to-[#8ED6B4]/70',
+}
+
+function MarqueeImage({ code }) {
+  const [stage, setStage] = useState('webp') // webp → png → dead（彻底失败，只留占位）
+  const [loaded, setLoaded] = useState(false)
+  const thumbs = getTypeThumbSources(code)
+  const placeholder = FAMILY_PLACEHOLDER[code.slice(0, 2)] ?? FAMILY_PLACEHOLDER.SR
+
+  return (
+    <div
+      className={`home-marquee-img relative h-[72px] w-[58px] shrink-0 overflow-hidden rounded-lg bg-gradient-to-br shadow-sm ring-1 ring-black/[0.05] sm:h-[90px] sm:w-[72px] ${placeholder}`}
+    >
+      <span className="absolute inset-0 flex items-center justify-center text-[10px] font-semibold tracking-wider text-white/80">
+        {code}
+      </span>
+      {stage !== 'dead' && (
+        <img
+          src={stage === 'webp' ? thumbs.webp : thumbs.png}
+          alt=""
+          width="72"
+          height="90"
+          decoding="async"
+          draggable="false"
+          onLoad={() => setLoaded(true)}
+          onError={() => setStage(stage === 'webp' ? 'png' : 'dead')}
+          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+        />
+      )}
+    </div>
+  )
+}
+
 export default function HomeSpectrumMarquee({ onOpenTypes }) {
   const { t } = useLanguage()
   const reduceMotion = useReducedMotion()
@@ -20,17 +62,7 @@ export default function HomeSpectrumMarquee({ onOpenTypes }) {
   const marqueeRow = (
     <>
       {TYPE_CODES.map((code) => (
-        <img
-          key={code}
-          src={getTypeImageSrc(code)}
-          alt=""
-          width="72"
-          height="90"
-          loading="lazy"
-          decoding="async"
-          draggable="false"
-          className="home-marquee-img h-[72px] w-[58px] shrink-0 rounded-lg object-cover shadow-sm ring-1 ring-black/[0.05] sm:h-[90px] sm:w-[72px]"
-        />
+        <MarqueeImage key={code} code={code} />
       ))}
     </>
   )

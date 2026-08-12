@@ -28,6 +28,19 @@ export function getTypeImageSources(code) {
 }
 
 /**
+ * 首页跑马灯专用缩略图（256x256，由 scripts/make-marquee-thumbs.py 生成）
+ * @param {string} code
+ * @returns {{ webp: string, png: string }}
+ */
+export function getTypeThumbSources(code) {
+  const normalized = normalizeTypeCode(code)
+  return {
+    webp: `/images/cpti/thumbs/${normalized}.webp`,
+    png: `/images/cpti/thumbs/${normalized}.png`,
+  }
+}
+
+/**
  * @param {string} code
  * @returns {string} 优先资源（webp）
  */
