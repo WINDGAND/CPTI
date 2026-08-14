@@ -10,7 +10,12 @@ import {
   normalizeAiChatPayload,
   normalizeAssistantText,
   parseDeepSeekResponse,
+  parseAiChatQuotaConfig,
   assertAiChatRateLimit,
+  createMemoryQuotaStore,
+  reserveAiChatQuota,
+  releaseAiChatQuota,
+  streamAiChatCompletionEvents,
 } from '../server/ai-chat-service.js'
 
 const singleResultData = {
@@ -224,3 +229,196 @@ test('assertAiChatRateLimit rejects requests beyond the window allowance', () =>
     /Too many AI chat requests/
   )
 })
+
+test('parseAiChatQuotaConfig falls back to defaults and ignores invalid values', () => {
+  assert.deepEqual(parseAiChatQuotaConfig({}), {
+    burstLimit: 20,
+    burstWindowSec: 900,
+    dailyLimit: 50,
+    globalDailyLimit: 3000,
+  })
+  assert.equal(parseAiChatQuotaConfig({ AI_CHAT_BURST_LIMIT: '8' }).burstLimit, 8)
+  assert.equal(parseAiChatQuotaConfig({ AI_CHAT_DAILY_LIMIT: '-1' }).dailyLimit, 50)
+})
+
+function quotaLimits(overrides = {}) {
+  return {
+    burstLimit: 20,
+    burstWindowSec: 900,
+    dailyLimit: 50,
+    globalDailyLimit: 3000,
+    ...overrides,
+  }
+}
+
+test('memory quota store rejects burst traffic and resets after the window', () => {
+  const store = createMemoryQuotaStore()
+  const limits = quotaLimits({ burstLimit: 2, burstWindowSec: 60 })
+  const fingerprintHash = 'burst-user'
+
+  assert.equal(store.reserve({ fingerprintHash, limits, nowMs: 0 }).ok, true)
+  assert.equal(store.reserve({ fingerprintHash, limits, nowMs: 1000 }).ok, true)
+
+  const denied = store.reserve({ fingerprintHash, limits, nowMs: 2000 })
+  assert.equal(denied.ok, false)
+  assert.equal(denied.code, 'ai-chat-rate-limited')
+  assert.equal(denied.retry_after_sec > 0, true)
+
+  const afterWindow = store.reserve({ fingerprintHash, limits, nowMs: 61_000 })
+  assert.equal(afterWindow.ok, true)
+})
+
+test('memory quota store enforces per-fingerprint daily limit', () => {
+  const store = createMemoryQuotaStore()
+  const limits = quotaLimits({ burstLimit: 100, dailyLimit: 2 })
+  const fingerprintHash = 'daily-user'
+
+  assert.equal(store.reserve({ fingerprintHash, limits, nowMs: 1_000 }).ok, true)
+  assert.equal(store.reserve({ fingerprintHash, limits, nowMs: 2_000 }).ok, true)
+
+  const denied = store.reserve({ fingerprintHash, limits, nowMs: 3_000 })
+  assert.equal(denied.ok, false)
+  assert.equal(denied.code, 'ai-chat-daily-limited')
+  assert.equal(store.inspect({ fingerprintHash, nowMs: 3_000 }).daily.count, 2)
+})
+
+test('memory quota store enforces global daily limit', () => {
+  const store = createMemoryQuotaStore()
+  const limits = quotaLimits({ burstLimit: 100, dailyLimit: 100, globalDailyLimit: 2 })
+
+  assert.equal(store.reserve({ fingerprintHash: 'a', limits, nowMs: 1_000 }).ok, true)
+  assert.equal(store.reserve({ fingerprintHash: 'b', limits, nowMs: 2_000 }).ok, true)
+
+  const denied = store.reserve({ fingerprintHash: 'c', limits, nowMs: 3_000 })
+  assert.equal(denied.ok, false)
+  assert.equal(denied.code, 'ai-chat-global-limited')
+  assert.equal(store.inspect({ fingerprintHash: 'c', nowMs: 3_000 }).global, 2)
+})
+
+test('reserveAiChatQuota fail-closes when persistent quota backend is missing', async () => {
+  await assert.rejects(
+    () => reserveAiChatQuota({
+      fingerprintHash: 'no-backend',
+      localState: new Map(),
+    }),
+    (error) => error.code === 'env-missing' && error.status === 500,
+  )
+})
+
+test('streamAiChatCompletionEvents rolls back quota if DeepSeek fails before stream', async () => {
+  const quotaStore = createMemoryQuotaStore()
+  const localState = new Map()
+  const limits = quotaLimits({ dailyLimit: 1, burstLimit: 10 })
+  const fingerprintHash = 'rollback-user'
+  const body = {
+    context: buildAiRelationshipContext(singleResultData),
+    messages: [{ role: 'user', content: '我们吵架了怎么办？' }],
+  }
+
+  await assert.rejects(
+    () => streamAiChatCompletionEvents({
+      apiKey: 'sk-test',
+      quotaStore,
+      quotaConfig: limits,
+      localState,
+      fingerprintHash,
+      nowMs: 1_000,
+      body,
+      fetchImpl: async () => new Response(JSON.stringify({ error: { message: 'upstream down' } }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    }),
+    (error) => error.code === 'deepseek-request-failed',
+  )
+
+  const snapshot = quotaStore.inspect({ fingerprintHash, nowMs: 1_000 })
+  assert.equal(snapshot.daily.count, 0)
+  assert.equal(snapshot.global, 0)
+
+  const retry = await reserveAiChatQuota({
+    fingerprintHash,
+    quotaStore,
+    quotaConfig: limits,
+    localState,
+    nowMs: 1_000,
+  })
+  assert.equal(retry, undefined)
+  assert.equal(quotaStore.inspect({ fingerprintHash, nowMs: 1_000 }).daily.count, 1)
+})
+
+test('streamAiChatCompletionEvents keeps quota after a successful DeepSeek stream', async () => {
+  const quotaStore = createMemoryQuotaStore()
+  const localState = new Map()
+  const limits = quotaLimits({ dailyLimit: 1, burstLimit: 10 })
+  const fingerprintHash = 'keep-user'
+  const sseBody = [
+    `data: ${JSON.stringify({ choices: [{ delta: { content: '先把情绪放慢。' } }] })}`,
+    '',
+    'data: [DONE]',
+    '',
+  ].join('\n')
+
+  const result = await streamAiChatCompletionEvents({
+    apiKey: 'sk-test',
+    quotaStore,
+    quotaConfig: limits,
+    localState,
+    fingerprintHash,
+    nowMs: 1_000,
+    body: {
+      context: buildAiRelationshipContext(singleResultData),
+      messages: [{ role: 'user', content: '我们吵架了怎么办？' }],
+    },
+    fetchImpl: async () => new Response(sseBody, {
+      status: 200,
+      headers: { 'Content-Type': 'text/event-stream' },
+    }),
+  })
+
+  assert.match(result.message, /先把情绪放慢/)
+  assert.equal(quotaStore.inspect({ fingerprintHash, nowMs: 1_000 }).daily.count, 1)
+
+  await assert.rejects(
+    () => reserveAiChatQuota({
+      fingerprintHash,
+      quotaStore,
+      quotaConfig: limits,
+      localState,
+      nowMs: 2_000,
+    }),
+    (error) => error.code === 'ai-chat-daily-limited' && error.status === 429,
+  )
+})
+
+test('releaseAiChatQuota restores a reserved slot', async () => {
+  const quotaStore = createMemoryQuotaStore()
+  const localState = new Map()
+  const limits = quotaLimits({ dailyLimit: 1 })
+  const fingerprintHash = 'release-user'
+
+  await reserveAiChatQuota({
+    fingerprintHash,
+    quotaStore,
+    quotaConfig: limits,
+    localState,
+    nowMs: 1_000,
+  })
+  await releaseAiChatQuota({
+    fingerprintHash,
+    quotaStore,
+    localState,
+    nowMs: 1_000,
+  })
+
+  assert.equal(quotaStore.inspect({ fingerprintHash, nowMs: 1_000 }).daily.count, 0)
+  await reserveAiChatQuota({
+    fingerprintHash,
+    quotaStore,
+    quotaConfig: limits,
+    localState,
+    nowMs: 1_000,
+  })
+  assert.equal(quotaStore.inspect({ fingerprintHash, nowMs: 1_000 }).daily.count, 1)
+})
+

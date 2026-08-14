@@ -44,6 +44,9 @@ function formatError(error, t) {
   if (error?.code === 'idle-timeout' || error?.code === 'hard-timeout') return t('chat.err_idle')
   if (error?.code === 'empty-response') return t('chat.err_empty')
   if (error?.status === 504) return t('chat.err_timeout')
+  if (error?.code === 'ai-chat-rate-limited') return t('chat.err_rate_limited')
+  if (error?.code === 'ai-chat-daily-limited') return t('chat.err_daily_limited')
+  if (error?.code === 'ai-chat-global-limited') return t('chat.err_global_limited')
   // 不直接使用 error.message —— 它由 aiChatApi.js 写死为中文，会绕过 i18n。
   // 统一回退到字典里的默认错误提示，保证中英环境一致。
   return t('chat.err_default')

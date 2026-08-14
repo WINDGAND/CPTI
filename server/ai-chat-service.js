@@ -1,3 +1,4 @@
+import { createClient } from '@supabase/supabase-js'
 import { VALID_CODES } from '../api/_shared/stats-helpers.js'
 
 const MAX_MESSAGE_LENGTH = 800
@@ -5,9 +6,15 @@ const MAX_CONTEXT_MESSAGES = 6
 const DEFAULT_DEEPSEEK_BASE_URL = 'https://api.deepseek.com'
 const DEFAULT_DEEPSEEK_MODEL = 'deepseek-v4-flash'
 const DEFAULT_TIMEOUT_MS = 20000
-const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000
-const MAX_REQUESTS_PER_WINDOW = 10
-const rateLimitState = new Map()
+
+export const DEFAULT_AI_CHAT_QUOTA = {
+  burstLimit: 20,
+  burstWindowSec: 900,
+  dailyLimit: 50,
+  globalDailyLimit: 3000,
+}
+
+const localBurstState = new Map()
 
 function createHttpError(status, message, code) {
   const error = new Error(message)
@@ -213,12 +220,159 @@ export async function* iterateDeepSeekStream(response) {
   }
 }
 
+function parsePositiveInt(value, fallback) {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback
+  return Math.floor(parsed)
+}
+
+export function parseAiChatQuotaConfig(env = {}) {
+  return {
+    burstLimit: parsePositiveInt(env.AI_CHAT_BURST_LIMIT, DEFAULT_AI_CHAT_QUOTA.burstLimit),
+    burstWindowSec: parsePositiveInt(env.AI_CHAT_BURST_WINDOW_SEC, DEFAULT_AI_CHAT_QUOTA.burstWindowSec),
+    dailyLimit: parsePositiveInt(env.AI_CHAT_DAILY_LIMIT, DEFAULT_AI_CHAT_QUOTA.dailyLimit),
+    globalDailyLimit: parsePositiveInt(env.AI_CHAT_GLOBAL_DAILY_LIMIT, DEFAULT_AI_CHAT_QUOTA.globalDailyLimit),
+  }
+}
+
+export function shanghaiDayKey(nowMs = Date.now()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(nowMs))
+}
+
+export function secondsUntilNextShanghaiMidnight(nowMs = Date.now()) {
+  const [year, month, day] = shanghaiDayKey(nowMs).split('-').map(Number)
+  const nextMidnightUtcMs = Date.UTC(year, month - 1, day + 1, 0, 0, 0) - 8 * 60 * 60 * 1000
+  return Math.max(1, Math.ceil((nextMidnightUtcMs - nowMs) / 1000))
+}
+
+function mergeQuotaConfig(quotaConfig = {}) {
+  return {
+    burstLimit: parsePositiveInt(quotaConfig.burstLimit, DEFAULT_AI_CHAT_QUOTA.burstLimit),
+    burstWindowSec: parsePositiveInt(quotaConfig.burstWindowSec, DEFAULT_AI_CHAT_QUOTA.burstWindowSec),
+    dailyLimit: parsePositiveInt(quotaConfig.dailyLimit, DEFAULT_AI_CHAT_QUOTA.dailyLimit),
+    globalDailyLimit: parsePositiveInt(quotaConfig.globalDailyLimit, DEFAULT_AI_CHAT_QUOTA.globalDailyLimit),
+  }
+}
+
+export function createMemoryQuotaStore() {
+  const dailyMap = new Map()
+  const globalMap = new Map()
+
+  function dailyKey(fingerprintHash, day) {
+    return `${fingerprintHash}|${day}`
+  }
+
+  return {
+    reserve({ fingerprintHash, limits, nowMs }) {
+      const day = shanghaiDayKey(nowMs)
+      const globalCount = globalMap.get(day) || 0
+      if (globalCount >= limits.globalDailyLimit) {
+        return {
+          ok: false,
+          code: 'ai-chat-global-limited',
+          retry_after_sec: secondsUntilNextShanghaiMidnight(nowMs),
+        }
+      }
+
+      const key = dailyKey(fingerprintHash, day)
+      const row = dailyMap.get(key) || { count: 0, burstWindowStartMs: nowMs, burstCount: 0 }
+      if (row.count >= limits.dailyLimit) {
+        return {
+          ok: false,
+          code: 'ai-chat-daily-limited',
+          retry_after_sec: secondsUntilNextShanghaiMidnight(nowMs),
+        }
+      }
+
+      let burstCount = row.burstCount
+      let burstWindowStartMs = row.burstWindowStartMs
+      if (burstWindowStartMs == null || nowMs - burstWindowStartMs >= limits.burstWindowSec * 1000) {
+        burstCount = 0
+        burstWindowStartMs = nowMs
+      }
+
+      if (burstCount >= limits.burstLimit) {
+        return {
+          ok: false,
+          code: 'ai-chat-rate-limited',
+          retry_after_sec: Math.max(
+            1,
+            Math.ceil((limits.burstWindowSec * 1000 - (nowMs - burstWindowStartMs)) / 1000),
+          ),
+        }
+      }
+
+      globalMap.set(day, globalCount + 1)
+      dailyMap.set(key, {
+        count: row.count + 1,
+        burstWindowStartMs,
+        burstCount: burstCount + 1,
+      })
+      return { ok: true, code: null, retry_after_sec: 0 }
+    },
+    release({ fingerprintHash, nowMs }) {
+      const day = shanghaiDayKey(nowMs)
+      const globalCount = globalMap.get(day) || 0
+      if (globalCount > 0) globalMap.set(day, globalCount - 1)
+
+      const key = dailyKey(fingerprintHash, day)
+      const row = dailyMap.get(key)
+      if (!row) return { ok: true }
+
+      dailyMap.set(key, {
+        count: Math.max(0, row.count - 1),
+        burstWindowStartMs: row.burstWindowStartMs,
+        burstCount: Math.max(0, row.burstCount - 1),
+      })
+      return { ok: true }
+    },
+    inspect({ fingerprintHash, nowMs }) {
+      const day = shanghaiDayKey(nowMs)
+      const key = dailyKey(fingerprintHash, day)
+      return {
+        global: globalMap.get(day) || 0,
+        daily: dailyMap.get(key) || { count: 0, burstWindowStartMs: 0, burstCount: 0 },
+      }
+    },
+  }
+}
+
+function getSupabaseAdminClient({ supabaseUrl, serviceRoleKey, fetchImpl }) {
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw createHttpError(500, 'Supabase environment variables are missing', 'env-missing')
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { fetch: fetchImpl ?? fetch },
+  })
+}
+
+function createQuotaError(result) {
+  const code = result?.code || 'ai-chat-rate-limited'
+  const messages = {
+    'ai-chat-rate-limited': 'Too many AI chat requests in a short time',
+    'ai-chat-daily-limited': 'Daily AI chat quota exceeded',
+    'ai-chat-global-limited': 'Global AI chat quota exceeded',
+    'fingerprint-required': 'Request fingerprint is required',
+  }
+  const status = code === 'fingerprint-required' ? 400 : 429
+  const error = createHttpError(status, messages[code] || messages['ai-chat-rate-limited'], code)
+  error.retryAfterSec = Number(result?.retry_after_sec) || 0
+  return error
+}
+
 export function assertAiChatRateLimit({
   fingerprintHash,
-  state = rateLimitState,
+  state = localBurstState,
   nowMs = Date.now(),
-  windowMs = RATE_LIMIT_WINDOW_MS,
-  maxRequests = MAX_REQUESTS_PER_WINDOW,
+  windowMs = DEFAULT_AI_CHAT_QUOTA.burstWindowSec * 1000,
+  maxRequests = DEFAULT_AI_CHAT_QUOTA.burstLimit,
 }) {
   const key = String(fingerprintHash || '').trim()
   if (!key) {
@@ -243,6 +397,98 @@ export function assertAiChatRateLimit({
 
   current.count += 1
   state.set(key, current)
+}
+
+export function releaseLocalAiChatBurst({ fingerprintHash, state = localBurstState }) {
+  const key = String(fingerprintHash || '').trim()
+  if (!key) return
+  const current = state.get(key)
+  if (!current || current.count <= 0) return
+  current.count -= 1
+  state.set(key, current)
+}
+
+async function rpcReserveQuota(options, fingerprintHash, limits) {
+  const supabase = options.supabase || getSupabaseAdminClient(options)
+  const { data, error } = await supabase.rpc('reserve_ai_chat_quota', {
+    p_fingerprint: fingerprintHash,
+    p_burst_limit: limits.burstLimit,
+    p_burst_window_sec: limits.burstWindowSec,
+    p_daily_limit: limits.dailyLimit,
+    p_global_daily_limit: limits.globalDailyLimit,
+  })
+  if (error) {
+    throw createHttpError(503, error.message || 'Quota RPC failed', 'ai-chat-quota-unavailable')
+  }
+  return data
+}
+
+async function rpcReleaseQuota(options, fingerprintHash) {
+  const supabase = options.supabase || getSupabaseAdminClient(options)
+  const { error } = await supabase.rpc('release_ai_chat_quota', {
+    p_fingerprint: fingerprintHash,
+  })
+  if (error) {
+    throw createHttpError(503, error.message || 'Quota release RPC failed', 'ai-chat-quota-unavailable')
+  }
+}
+
+export async function reserveAiChatQuota(options) {
+  const fingerprintHash = String(options?.fingerprintHash || '').trim()
+  if (!fingerprintHash) {
+    throw createHttpError(400, 'Request fingerprint is required', 'fingerprint-required')
+  }
+
+  const limits = mergeQuotaConfig(options.quotaConfig)
+  const nowMs = options.nowMs ?? Date.now()
+  const localState = options.localState ?? localBurstState
+
+  assertAiChatRateLimit({
+    fingerprintHash,
+    state: localState,
+    nowMs,
+    windowMs: limits.burstWindowSec * 1000,
+    maxRequests: limits.burstLimit,
+  })
+
+  let persistentOk = false
+  try {
+    const result = options.quotaStore
+      ? options.quotaStore.reserve({ fingerprintHash, limits, nowMs })
+      : await rpcReserveQuota(options, fingerprintHash, limits)
+
+    if (!result?.ok) {
+      throw createQuotaError(result)
+    }
+    persistentOk = true
+  } catch (error) {
+    if (error?.status === 429 || error?.code === 'fingerprint-required') throw error
+    if (error?.code === 'env-missing' || error?.code === 'ai-chat-quota-unavailable') throw error
+    throw createHttpError(503, 'AI chat quota service is unavailable', 'ai-chat-quota-unavailable')
+  } finally {
+    if (!persistentOk) {
+      releaseLocalAiChatBurst({ fingerprintHash, state: localState })
+    }
+  }
+}
+
+export async function releaseAiChatQuota(options) {
+  const fingerprintHash = String(options?.fingerprintHash || '').trim()
+  if (!fingerprintHash) return
+
+  const nowMs = options.nowMs ?? Date.now()
+  const localState = options.localState ?? localBurstState
+  releaseLocalAiChatBurst({ fingerprintHash, state: localState })
+
+  try {
+    if (options.quotaStore) {
+      options.quotaStore.release({ fingerprintHash, nowMs })
+      return
+    }
+    await rpcReleaseQuota(options, fingerprintHash)
+  } catch (error) {
+    console.warn('[ai-chat] failed to release quota', error)
+  }
 }
 
 function buildEndpoint(baseUrl) {
@@ -279,6 +525,20 @@ async function postDeepSeek({
   })
 }
 
+function quotaCallOptions(args) {
+  return {
+    fingerprintHash: args.fingerprintHash,
+    supabaseUrl: args.supabaseUrl,
+    serviceRoleKey: args.serviceRoleKey,
+    supabase: args.supabase,
+    quotaStore: args.quotaStore,
+    quotaConfig: args.quotaConfig,
+    localState: args.localState,
+    nowMs: args.nowMs,
+    fetchImpl: args.fetchImpl,
+  }
+}
+
 export async function requestAiChatCompletion({
   apiKey,
   baseUrl = DEFAULT_DEEPSEEK_BASE_URL,
@@ -287,15 +547,35 @@ export async function requestAiChatCompletion({
   body,
   fingerprintHash,
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  supabaseUrl,
+  serviceRoleKey,
+  supabase,
+  quotaStore,
+  quotaConfig,
+  localState,
+  nowMs,
 }) {
   if (!apiKey) {
     throw createHttpError(500, 'DeepSeek API key is missing', 'deepseek-key-missing')
   }
 
   const normalized = normalizeAiChatPayload(body)
-  assertAiChatRateLimit({ fingerprintHash })
+  const quotaArgs = quotaCallOptions({
+    fingerprintHash,
+    supabaseUrl,
+    serviceRoleKey,
+    supabase,
+    quotaStore,
+    quotaConfig,
+    localState,
+    nowMs,
+    fetchImpl,
+  })
+  await reserveAiChatQuota(quotaArgs)
+
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
+  let streamStarted = false
 
   try {
     const response = await postDeepSeek({
@@ -323,8 +603,12 @@ export async function requestAiChatCompletion({
       )
     }
 
+    streamStarted = true
     return { message: parseDeepSeekResponse(payload) }
   } catch (error) {
+    if (!streamStarted) {
+      await releaseAiChatQuota(quotaArgs)
+    }
     if (error?.name === 'AbortError') {
       throw createHttpError(504, 'DeepSeek request timed out', 'deepseek-timeout')
     }
@@ -343,6 +627,13 @@ export async function requestAiChatCompletionStream({
   fingerprintHash,
   timeoutMs = DEFAULT_TIMEOUT_MS,
   onDelta,
+  supabaseUrl,
+  serviceRoleKey,
+  supabase,
+  quotaStore,
+  quotaConfig,
+  localState,
+  nowMs,
 }) {
   return streamAiChatCompletionEvents({
     apiKey,
@@ -352,6 +643,13 @@ export async function requestAiChatCompletionStream({
     body,
     fingerprintHash,
     timeoutMs,
+    supabaseUrl,
+    serviceRoleKey,
+    supabase,
+    quotaStore,
+    quotaConfig,
+    localState,
+    nowMs,
     onEvent: (event) => {
       if (event.delta) {
         onDelta?.(event.delta, event.message)
@@ -373,15 +671,35 @@ export async function streamAiChatCompletionEvents({
   fingerprintHash,
   timeoutMs = DEFAULT_TIMEOUT_MS,
   onEvent,
+  supabaseUrl,
+  serviceRoleKey,
+  supabase,
+  quotaStore,
+  quotaConfig,
+  localState,
+  nowMs,
 }) {
   if (!apiKey) {
     throw createHttpError(500, 'DeepSeek API key is missing', 'deepseek-key-missing')
   }
 
   const normalized = normalizeAiChatPayload(body)
-  assertAiChatRateLimit({ fingerprintHash })
+  const quotaArgs = quotaCallOptions({
+    fingerprintHash,
+    supabaseUrl,
+    serviceRoleKey,
+    supabase,
+    quotaStore,
+    quotaConfig,
+    localState,
+    nowMs,
+    fetchImpl,
+  })
+  await reserveAiChatQuota(quotaArgs)
+
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
+  let streamStarted = false
 
   try {
     const response = await postDeepSeek({
@@ -408,6 +726,7 @@ export async function streamAiChatCompletionEvents({
       )
     }
 
+    streamStarted = true
     let message = ''
     for await (const delta of iterateDeepSeekStream(response)) {
       message += delta
@@ -418,6 +737,9 @@ export async function streamAiChatCompletionEvents({
     onEvent?.({ done: true, message: finalMessage })
     return { message: finalMessage }
   } catch (error) {
+    if (!streamStarted) {
+      await releaseAiChatQuota(quotaArgs)
+    }
     if (error?.name === 'AbortError') {
       throw createHttpError(504, 'DeepSeek request timed out', 'deepseek-timeout')
     }

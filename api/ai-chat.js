@@ -1,5 +1,6 @@
 import {
   encodeSseEvent,
+  parseAiChatQuotaConfig,
   streamAiChatCompletionEvents,
 } from '../server/ai-chat-service.js'
 import {
@@ -77,6 +78,9 @@ export default async function handler(request) {
           apiKey: process.env.DEEPSEEK_API_KEY,
           baseUrl: process.env.DEEPSEEK_BASE_URL,
           model: process.env.DEEPSEEK_MODEL,
+          supabaseUrl: process.env.SUPABASE_URL,
+          serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+          quotaConfig: parseAiChatQuotaConfig(process.env),
           fetchImpl: fetch,
           body,
           fingerprintHash,
@@ -90,6 +94,7 @@ export default async function handler(request) {
           error: error instanceof Error ? error.message : 'Unexpected error',
           code: error?.code || 'ai-chat-error',
           status,
+          retry_after_sec: Number(error?.retryAfterSec) || 0,
         })))
       } finally {
         clearInterval(heartbeat)
