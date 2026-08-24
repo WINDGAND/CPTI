@@ -18,6 +18,15 @@ function formatTimestamp(input) {
   }
 }
 
+/**
+ * 把对话消息转成可复制的 Markdown 文本（含类型码、模式与免责声明）
+ *
+ * @param {Array<{ role?: string, content?: string, createdAt?: string }>} messages 会话消息；无 content 的条目会被跳过
+ * @param {{ context?: { code?: string, title?: string, mode?: string }, title?: string }} [options]
+ * @param {object} [options.context] 当前测评上下文（类型码 / 标题 / 单双人模式）
+ * @param {string} [options.title] 文档一级标题；缺省用产品默认标题
+ * @returns {string} Markdown 字符串；无网络副作用
+ */
 export function toMarkdown(messages, { context, title } = {}) {
   const header = []
   const heading = title || 'CPTI · AI 关系助手对话'
@@ -47,6 +56,13 @@ export function toMarkdown(messages, { context, title } = {}) {
   return `${header.join('\n')}${body}${footer}`
 }
 
+/**
+ * 把文本写入系统剪贴板
+ *
+ * @param {string} text 待复制内容
+ * @returns {Promise<boolean>} 成功 true；SSR、权限拒绝或降级失败则为 false
+ * 副作用：优先 `navigator.clipboard.writeText`；失败则插入隐藏 textarea 走 `execCommand('copy')`
+ */
 export async function copyTextToClipboard(text) {
   if (typeof window === 'undefined') return false
   const value = String(text || '')
@@ -56,7 +72,7 @@ export async function copyTextToClipboard(text) {
       return true
     }
   } catch {
-    /* 降级到 textarea + execCommand */
+    /* 非安全上下文 / 权限拒绝：降级到 textarea + execCommand */
   }
   try {
     const textarea = document.createElement('textarea')
@@ -76,6 +92,18 @@ export async function copyTextToClipboard(text) {
   }
 }
 
+/**
+ * 用 html2canvas 把 DOM 节点渲染成 PNG 并触发浏览器下载
+ *
+ * @param {HTMLElement} node 要截图的根节点
+ * @param {{ fileName?: string, backgroundColor?: string, scale?: number }} [options]
+ * @param {string} [options.fileName='cpti-ai-chat.png'] 下载文件名
+ * @param {string} [options.backgroundColor='#ffffff'] 画布背景色
+ * @param {number} [options.scale=2] 渲染倍率，提高清晰度
+ * @returns {Promise<Blob>} 生成的 PNG Blob
+ * @throws {Error} 节点缺失或 canvas→blob 失败
+ * 副作用：动态 import html2canvas；创建临时 `<a download>` 点击下载；1 秒后 revokeObjectURL
+ */
 export async function exportElementAsImage(node, { fileName = 'cpti-ai-chat.png', backgroundColor = '#ffffff', scale = 2 } = {}) {
   if (!node) throw new Error('export target missing')
   const { default: html2canvas } = await import('html2canvas')
