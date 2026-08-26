@@ -15,17 +15,31 @@
 const STORE_PREFIX = 'cpti_ai_chat_v2'
 const LEGACY_PREFIX = 'cpti_ai_chat'
 
+/** 单会话消息条数上限；超出时只保留最近若干条，避免撑爆 localStorage */
 export const MAX_MESSAGES_PER_SESSION = 60
+/** 同一 (mode, code) 档案下的会话个数上限；超出时淘汰列表尾部旧会话 */
 export const MAX_SESSIONS_PER_PROFILE = 20
 
 function nowIso() {
   return new Date().toISOString()
 }
 
+/**
+ * 生成带前缀的短 id（时间戳 36 进制 + 随机片段），用作会话 / 消息主键
+ *
+ * @param {string} prefix 如 `'s'` / `'user'` / `'assistant'`
+ * @returns {string}
+ */
 function genId(prefix) {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
 }
 
+/**
+ * 把测评上下文规范成存储键：mode 非 dual 一律当 single；类型码只留 A-Z
+ *
+ * @param {{ mode?: string, code?: string }} context
+ * @returns {{ mode: string, code: string, storeKey: string, legacyKey: string }}
+ */
 function safeKey(context) {
   const mode = context?.mode === 'dual' ? 'dual' : 'single'
   const code = String(context?.code || 'UNKNOWN').toUpperCase().replace(/[^A-Z]/g, '') || 'UNKNOWN'
@@ -62,6 +76,12 @@ function removeKey(key) {
   }
 }
 
+/**
+ * 清洗单条消息：只保留 user / assistant，去掉空白内容
+ *
+ * @param {object} message
+ * @returns {{ id: string, role: 'user'|'assistant', content: string, createdAt: string } | null}
+ */
 function sanitizeMessage(message) {
   if (!message || typeof message !== 'object') return null
   if (!['user', 'assistant'].includes(message.role)) return null
@@ -89,6 +109,13 @@ function sanitizeSession(session) {
   }
 }
 
+/**
+ * 把旧版「纯消息数组」迁成一条会话
+ *
+ * @param {string} legacyKey
+ * @returns {object|null} 无可迁移内容时返回 null
+ * 副作用：成功时删除 legacyKey，避免下次再迁
+ */
 function migrateLegacy(legacyKey) {
   const legacy = readJson(legacyKey, null)
   if (!Array.isArray(legacy) || legacy.length === 0) return null
@@ -108,6 +135,7 @@ function migrateLegacy(legacyKey) {
 function readStore(context) {
   const { storeKey, legacyKey } = safeKey(context)
   const raw = readJson(storeKey, null)
+  // 已有 v2 结构（哪怕 sessions 为空）就不再碰旧 key，避免重复迁移
   if (raw && Array.isArray(raw.sessions)) {
     return {
       sessions: raw.sessions.map(sanitizeSession).filter(Boolean),
@@ -129,6 +157,7 @@ function writeStore(context, store) {
     sessions: store.sessions
       .map(sanitizeSession)
       .filter(Boolean)
+      // 与 createSession 的 slice(0, N) 不同：这里按数组尾部截断，保留末尾最多 N 条
       .slice(-MAX_SESSIONS_PER_PROFILE),
     currentSessionId: typeof store.currentSessionId === 'string' ? store.currentSessionId : null,
   }
@@ -139,11 +168,24 @@ function writeStore(context, store) {
 /** 各语言下的默认会话标题（持久化里可能混存，展示时需统一映射） */
 export const DEFAULT_SESSION_TITLES = new Set(['新的对话', 'New chat', 'New Chat'])
 
+/**
+ * 判断标题是否为各语言下的「新对话」占位名（或空串）
+ *
+ * @param {string} title
+ * @returns {boolean} true 时展示层应改用首条用户消息派生标题
+ */
 export function isDefaultSessionTitle(title) {
   const clean = String(title || '').trim()
   return !clean || DEFAULT_SESSION_TITLES.has(clean)
 }
 
+/**
+ * 用首条用户消息生成会话标题
+ *
+ * @param {Array<{ role?: string, content?: string }>} messages
+ * @param {string} [defaultTitle=''] 没有用户消息时的回退标题
+ * @returns {string} 超过 18 字时截断并加省略号
+ */
 export function deriveTitle(messages, defaultTitle = '') {
   const firstUser = (Array.isArray(messages) ? messages : []).find((m) => m?.role === 'user')
   const text = String(firstUser?.content || '').replace(/\s+/g, ' ').trim()
@@ -151,6 +193,14 @@ export function deriveTitle(messages, defaultTitle = '') {
   return text.length > 18 ? `${text.slice(0, 18)}…` : text
 }
 
+/**
+ * 解析展示用标题：自定义名原样返回；占位名则按消息派生
+ *
+ * @param {string} storedTitle
+ * @param {Array} messages
+ * @param {string} defaultTitle
+ * @returns {string}
+ */
 export function resolveSessionTitle(storedTitle, messages, defaultTitle) {
   if (!isDefaultSessionTitle(storedTitle)) return storedTitle
   return deriveTitle(messages, defaultTitle)
@@ -158,6 +208,13 @@ export function resolveSessionTitle(storedTitle, messages, defaultTitle) {
 
 /* ─── public API ────────────────────────────────────────── */
 
+/**
+ * 列出某测评档案下的全部会话（按 updatedAt 降序）
+ *
+ * @param {{ mode?: string, code?: string }} context
+ * @returns {{ sessions: object[], currentSessionId: string|null }}
+ * 副作用：若仍是旧版纯数组存储，会迁移写入 v2 key 并删除 legacy key
+ */
 export function listSessions(context) {
   const store = readStore(context)
   const sorted = [...store.sessions].sort((a, b) => {
@@ -168,12 +225,27 @@ export function listSessions(context) {
   return { sessions: sorted, currentSessionId: store.currentSessionId }
 }
 
+/**
+ * 按 id 读取单条会话
+ *
+ * @param {{ mode?: string, code?: string }} context
+ * @param {string} sessionId
+ * @returns {object|null} 找不到或未传 id 时返回 null
+ */
 export function getSession(context, sessionId) {
   if (!sessionId) return null
   const store = readStore(context)
   return store.sessions.find((s) => s.id === sessionId) || null
 }
 
+/**
+ * 新建会话并设为当前会话
+ *
+ * @param {{ mode?: string, code?: string }} context
+ * @param {{ title?: string, messages?: object[] }} [init]
+ * @returns {object} 规范化后的会话
+ * 副作用：写入 localStorage；超出上限时丢掉列表尾部旧会话
+ */
 export function createSession(context, { title = '', messages = [] } = {}) {
   const store = readStore(context)
   const session = sanitizeSession({
@@ -188,6 +260,14 @@ export function createSession(context, { title = '', messages = [] } = {}) {
   return session
 }
 
+/**
+ * 保存 / 覆盖一条会话（不存在则插入到列表头部）
+ *
+ * @param {{ mode?: string, code?: string }} context
+ * @param {object} session
+ * @returns {object} 规范化后的会话（updatedAt 刷新为当前时间）
+ * 副作用：写入 localStorage
+ */
 export function saveSession(context, session) {
   const store = readStore(context)
   const safe = sanitizeSession({ ...session, updatedAt: nowIso() })
@@ -199,6 +279,15 @@ export function saveSession(context, session) {
   return safe
 }
 
+/**
+ * 重命名会话；空标题回退为「未命名对话」，最长 40 字
+ *
+ * @param {{ mode?: string, code?: string }} context
+ * @param {string} sessionId
+ * @param {string} nextTitle
+ * @returns {void}
+ * 副作用：写入 localStorage
+ */
 export function renameSession(context, sessionId, nextTitle) {
   const store = readStore(context)
   const cleanTitle = String(nextTitle || '').trim().slice(0, 40) || '未命名对话'
@@ -208,6 +297,14 @@ export function renameSession(context, sessionId, nextTitle) {
   writeStore(context, { sessions: nextSessions, currentSessionId: store.currentSessionId })
 }
 
+/**
+ * 删除会话；若删的是当前会话则改指剩下列表的第一条
+ *
+ * @param {{ mode?: string, code?: string }} context
+ * @param {string} sessionId
+ * @returns {string|null} 删除后的 currentSessionId
+ * 副作用：写入 localStorage
+ */
 export function deleteSession(context, sessionId) {
   const store = readStore(context)
   const nextSessions = store.sessions.filter((s) => s.id !== sessionId)
@@ -218,12 +315,27 @@ export function deleteSession(context, sessionId) {
   return nextCurrent
 }
 
+/**
+ * 切换当前会话；id 不在列表中时静默忽略
+ *
+ * @param {{ mode?: string, code?: string }} context
+ * @param {string|null} sessionId
+ * @returns {void}
+ * 副作用：写入 localStorage
+ */
 export function setCurrentSession(context, sessionId) {
   const store = readStore(context)
   if (sessionId && !store.sessions.some((s) => s.id === sessionId)) return
   writeStore(context, { sessions: store.sessions, currentSessionId: sessionId || null })
 }
 
+/**
+ * 清空该档案下全部会话
+ *
+ * @param {{ mode?: string, code?: string }} context
+ * @returns {void}
+ * 副作用：写入 localStorage
+ */
 export function clearAllSessions(context) {
   writeStore(context, { sessions: [], currentSessionId: null })
 }
