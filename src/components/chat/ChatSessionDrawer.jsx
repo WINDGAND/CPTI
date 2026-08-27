@@ -1,3 +1,10 @@
+/**
+ * AI 关系助手 · 会话历史抽屉 / 桌面侧栏
+ *
+ * 移动端（variant='mobile'）：从右侧滑出 overlay，选中或新建会话后关闭。
+ * 桌面端（variant='desktop'）：固定 260px 侧栏；collapsed 时宽度收到 0 做收起动画。
+ * 列表行可重命名、删除；「更多」菜单 Portal 到 document.body，避免被祖先 overflow 裁切。
+ */
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -10,6 +17,7 @@ function formatSessionTime(input, t) {
     const d = new Date(input)
     if (Number.isNaN(d.getTime())) return ''
     const diff = Date.now() - d.getTime()
+    // 1 分钟 / 1 小时 / 24 小时内用相对文案；更早只显示月-日，避免列表被完整时间戳撑开
     if (diff < 60_000) return t('chat.just_now')
     if (diff < 3_600_000) return t('chat.minutes_ago', { n: Math.floor(diff / 60_000) })
     if (diff < 86_400_000) return t('chat.hours_ago', { n: Math.floor(diff / 3_600_000) })
@@ -32,6 +40,7 @@ function SessionRow({ session, isCurrent, onSelect, onRename, onDelete }) {
 
   useEffect(() => {
     if (!menuOpen) return
+    // 点菜单外、页面滚动或窗口缩放都关掉，避免 Portal 菜单悬空错位
     function handler(e) {
       if (
         menuRef.current && !menuRef.current.contains(e.target)
@@ -88,6 +97,7 @@ function SessionRow({ session, isCurrent, onSelect, onRename, onDelete }) {
   function commitRename() {
     const next = draft.trim().slice(0, 40)
     setRenaming(false)
+    // 空串或未改动不回调，避免用空白覆盖已有标题
     if (next && next !== session.title) {
       onRename?.(session.id, next)
     }
@@ -244,6 +254,23 @@ function SessionList({ sessions, currentSessionId, onSelectSession, onRenameSess
   )
 }
 
+/**
+ * 按 variant 渲染移动端抽屉或桌面侧栏；不读写会话存储（由父组件经 props 注入）。
+ *
+ * @param {object} props
+ * @param {Array<{id: string, title?: string, messages?: Array, createdAt?: string, updatedAt?: string}>} props.sessions
+ * @param {string} [props.currentSessionId] 当前选中会话 id，行上会加强调条
+ * @param {boolean} [props.open] 仅移动端：抽屉是否打开
+ * @param {function} [props.onClose] 关闭抽屉（移动端点遮罩 / 关闭钮 / 选中后）
+ * @param {function} [props.onSelectSession]
+ * @param {function} [props.onNewSession]
+ * @param {function} [props.onRenameSession]
+ * @param {function} [props.onDeleteSession]
+ * @param {'mobile'|'desktop'} [props.variant='mobile']
+ * @param {boolean} [props.collapsed=false] 桌面端收起到宽度 0；为 true 时 aria-hidden
+ * @param {import('react').ReactNode} [props.footer] 列表底部插槽（如额度提示）
+ * @returns {JSX.Element}
+ */
 export default function ChatSessionDrawer({
   sessions,
   currentSessionId,
@@ -332,6 +359,7 @@ export default function ChatSessionDrawer({
                 <X size={17} />
               </button>
             </div>
+            {/* 选中 / 新建后立刻关抽屉，避免挡住对话区；桌面侧栏不走这条分支 */}
             <SessionList
               sessions={sessions}
               currentSessionId={currentSessionId}

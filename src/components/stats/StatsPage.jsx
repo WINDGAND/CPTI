@@ -1,3 +1,10 @@
+/**
+ * 公开统计页：请求匿名汇总，展示 16 型甜甜圈、四大色系占比、Top/Bottom3 与洞察。
+ *
+ * 加载中用骨架/占位条；失败可点重试（递增 retryCount 重新拉数）。
+ * 远端 title / 色系 label / cuteTags / insights 会按当前语言改写；
+ * 英文 insight 不直接翻译对象，而是按分布位次现算文案。
+ */
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { ArrowRight, Sparkles, TrendingDown, TrendingUp } from 'lucide-react'
@@ -61,7 +68,7 @@ function CountUpNumber({ target, locale = 'zh-CN' }) {
 
   useEffect(() => {
     let raf = 0
-    const duration = 1000
+    const duration = 1000 // rAF 约 1s 线性从 0 插到 target；卸载时 cancel 避免 setState
     const start = performance.now()
 
     function tick(now) {
@@ -105,6 +112,7 @@ function GhostButton({ children, onClick }) {
 }
 
 function polarToCartesian(cx, cy, radius, angleDeg) {
+  // SVG 默认 0° 在 3 点钟；减 90° 让扇区从 12 点钟顺时针展开
   const rad = ((angleDeg - 90) * Math.PI) / 180
   return {
     x: cx + radius * Math.cos(rad),
@@ -117,6 +125,7 @@ function createDonutSlicePath(cx, cy, outerR, innerR, startDeg, endDeg) {
   const endOuter = polarToCartesian(cx, cy, outerR, endDeg)
   const startInner = polarToCartesian(cx, cy, innerR, startDeg)
   const endInner = polarToCartesian(cx, cy, innerR, endDeg)
+  // 跨过半圆必须开 large-arc，否则扇区会画成较短的那一段
   const largeArcFlag = endDeg - startDeg > 180 ? 1 : 0
 
   return [
@@ -128,6 +137,14 @@ function createDonutSlicePath(cx, cy, outerR, innerR, startDeg, endDeg) {
   ].join(' ')
 }
 
+/**
+ * 统计页主组件。副作用：挂载与 retryCount 变化时 GET 汇总接口；不写入测评结果。
+ *
+ * @param {{ onStartTest?: function, onGoTypes?: function }} props
+ * @param {function} [props.onStartTest] 页脚「开始测试」
+ * @param {function} [props.onGoTypes] 页脚「查看 16 型」
+ * @returns {JSX.Element}
+ */
 export default function StatsPage({ onStartTest, onGoTypes }) {
   const { t, lang } = useLanguage()
   const GROUP_META = useLocalizedTypeGroupMeta()
@@ -152,6 +169,7 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
       setRequestState('loading')
       try {
         const remote = await fetchStatsSummary()
+        // 卸载丢弃；空分布不当作成功也不当失败，保持 loading 直到用户点重试
         if (disposed || !remote?.typeDistribution?.length) return
         setStatsDataRaw(remote)
         setActiveCode(remote.typeDistribution[0]?.code ?? null)
@@ -167,7 +185,7 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
     }
 
     loadRemoteStats()
-    return () => { disposed = true }
+    return () => { disposed = true } // retryCount 重跑时丢弃上一轮慢响应，避免写回过期 state
   }, [retryCount, t])
 
   // 用当前语言改写远端数据中的 title / label / cuteTags / sourceNote / insights
@@ -270,6 +288,7 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
     if (!hasData) return
     const exists = statsData.typeDistribution.some((item) => item.code === activeCode)
     if (!exists) {
+      // 语言切换或远端刷新后高亮码可能消失，回落到第一条避免甜甜圈无选中
       setActiveCode(statsData.typeDistribution[0].code)
     }
   }, [activeCode, hasData, statsData])
