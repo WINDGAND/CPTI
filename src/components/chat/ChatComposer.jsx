@@ -1,9 +1,34 @@
+/**
+ * AI 关系助手 · 底部输入条
+ *
+ * 自适应高度的 textarea（视觉上限 168px、字数上限 800）。
+ * Enter 发送、Shift+Enter 换行；中文 IME 合成中的 Enter 不提交。
+ * 流式生成中且 canStop 时，同一提交按钮变为「停止」，避免用户另找入口。
+ * 不读写会话存储；发送 / 停止 / 清引用都经 props 回调交给父组件。
+ */
 import { useEffect, useRef } from 'react'
 import { Send, Square, X } from 'lucide-react'
 import { useLanguage } from '../../i18n/LanguageContext'
 
+/** 与聊天气泡就地编辑上限对齐，避免输入比编辑能写更长 */
 const MAX_LENGTH = 800
 
+/**
+ * 对话输入条（含可选引用条与接近上限时的字数提示）
+ *
+ * @param {object} props
+ * @param {string} props.value 受控正文
+ * @param {function} [props.onChange]
+ * @param {function} [props.onSubmit] 发送；输入为空时按钮 disabled，但表单 submit 仍会被拦截
+ * @param {function} [props.onStop] 仅 isSending && canStop 时由提交按钮触发
+ * @param {boolean} [props.isSending=false]
+ * @param {boolean} [props.canStop=false] false 时发送中仍显示发送钮且不可点
+ * @param {string} [props.quoteText=''] 非空则在输入框上方展示引用条
+ * @param {function} [props.onClearQuote]
+ * @param {boolean} [props.disabled=false] 例如额度用尽时整框禁用
+ * @param {string} [props.placeholder] 缺省用 i18n 占位文案
+ * @returns {JSX.Element}
+ */
 export default function ChatComposer({
   value,
   onChange,
@@ -29,6 +54,7 @@ export default function ChatComposer({
   }, [value])
 
   function handleKeyDown(event) {
+    // isComposing：拼音/五笔选词时的 Enter 不能当成发送
     if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent?.isComposing) {
       event.preventDefault()
       if (!isSending) onSubmit?.()
@@ -38,6 +64,7 @@ export default function ChatComposer({
   function handleSubmit(event) {
     event.preventDefault()
     if (isSending) {
+      // 同一 type=submit：生成中点它等于停止，而不是再发一条
       if (canStop) onStop?.()
       return
     }

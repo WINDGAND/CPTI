@@ -1,3 +1,12 @@
+/**
+ * AI 关系助手 · 分享海报弹层
+ *
+ * 把当前选中的对话渲染成主题色海报，支持：
+ *   1. 复制 Markdown（走 clipboard，失败时按钮短暂显示 fail）
+ *   2. 用 html2canvas 把海报 DOM 导出为 PNG 并触发下载
+ * 未知 themeClass 回落到湖水蓝 theme-blue，与结果页四大色系默认值一致。
+ * 无会话存储副作用；剪贴板 / 下载由 aiChatExport 完成。
+ */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Check, Copy, Download, Image as ImageIcon, Loader2, X } from 'lucide-react'
@@ -5,6 +14,7 @@ import { copyTextToClipboard, exportElementAsImage, toMarkdown } from '../../uti
 import AiMessageContent from './AiMessageContent'
 import { useLanguage } from '../../i18n/LanguageContext'
 
+/** 海报头图渐变 + 强调色；键名与结果页 themeClass（粉/蓝/紫/绿）对齐 */
 const POSTER_THEME_BG = {
   'theme-pink':   { gradient: 'linear-gradient(160deg, #FFF5F7 0%, #FFE2E8 100%)', accent: '#F4A7B0' },
   'theme-blue':   { gradient: 'linear-gradient(160deg, #F0F8FF 0%, #DCEBF8 100%)', accent: '#76B8E0' },
@@ -12,11 +22,24 @@ const POSTER_THEME_BG = {
   'theme-green':  { gradient: 'linear-gradient(160deg, #F0FBF5 0%, #DBF4E6 100%)', accent: '#8ED6B4' },
 }
 
+/** 导出文件名与海报页脚用的 YYYY-MM-DD，不走用户语言环境以免路径非法字符 */
 function formatExportDate(d = new Date()) {
   const pad = (n) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
+/**
+ * 分享弹层：预览海报并导出 Markdown / PNG。不写入 localStorage。
+ *
+ * @param {object} props
+ * @param {boolean} props.open 为 false 时不挂载面板，并复位复制/导出按钮态
+ * @param {function} props.onClose 点遮罩或关闭钮
+ * @param {Array<{id?: string, role?: string, content?: string}>} [props.messages] 待导出消息；无 content 的条目会被滤掉
+ * @param {{ code?: string, title?: string, mode?: string }} [props.context] 测评上下文，写入海报副标题与文件名
+ * @param {string} [props.themeClass='theme-blue'] 结果主题类名；未知值回落 theme-blue
+ * @param {string} [props.sessionTitle] 海报主标题；缺省用「精选对话」文案
+ * @returns {JSX.Element}
+ */
 export default function ChatShareModal({
   open,
   onClose,
@@ -31,17 +54,21 @@ export default function ChatShareModal({
   const [copyState, setCopyState] = useState('idle') // idle | done | fail
   const [exportState, setExportState] = useState('idle') // idle | busy | done | fail
 
+  // 未知色系不抛错：海报仍可导出，只是用默认湖水蓝
   const theme = POSTER_THEME_BG[themeClass] || POSTER_THEME_BG['theme-blue']
+  // 空气泡不进海报 / Markdown，避免导出一串空白圆角块
   const exportMessages = useMemo(() => (messages || []).filter((m) => m?.content), [messages])
 
   useEffect(() => {
     if (!open) {
+      // 关掉后再开时不应残留「已复制 / 已导出」成功态
       setCopyState('idle')
       setExportState('idle')
     }
   }, [open])
 
   async function handleCopyMarkdown() {
+    // toast 窗口内忽略重复点击，避免连续写剪贴板
     if (copyState === 'done') return
     const md = toMarkdown(exportMessages, { context, title: resolvedSessionTitle })
     const ok = await copyTextToClipboard(md)
@@ -50,6 +77,7 @@ export default function ChatShareModal({
   }
 
   async function handleExportImage() {
+    // html2canvas 进行中再点会叠一张图；busy 直接丢掉
     if (exportState === 'busy') return
     setExportState('busy')
     try {
