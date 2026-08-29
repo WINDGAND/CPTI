@@ -1,11 +1,21 @@
+/**
+ * AI 关系助手 · 单条聊天气泡
+ *
+ * 用户气泡用壳层注入的 --poster-accent；助手气泡白底 + 左侧主题色锚条。
+ * 工具栏：复制、引用、重新生成（仅最后一条助手消息）、就地编辑并重发（仅最后一条用户消息）、删除。
+ * 长按约 480ms 进入多选；选择模式下点击行切换勾选。流式输出时不显示工具栏与时间戳。
+ * 不直接读写会话存储；动作都经 props 回调交给父组件。
+ */
 import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Check, Copy, Pencil, Quote, RotateCcw, Trash2 } from 'lucide-react'
 import AiMessageContent from './AiMessageContent'
 import { useLanguage } from '../../i18n/LanguageContext'
 
+/** 与输入条 MAX_LENGTH 对齐，避免编辑能写出比发送更长的正文 */
 const EDIT_MAX_LENGTH = 800
 
+/** 气泡旁相对时间：1 分钟 / 1 小时 / 24 小时内用相对文案；更早显示 月-日 时:分 */
 function formatRelative(input, t) {
   try {
     const d = input ? new Date(input) : new Date()
@@ -21,6 +31,25 @@ function formatRelative(input, t) {
   }
 }
 
+/**
+ * 单条用户 / 助手气泡（含选择、编辑、长按多选）
+ *
+ * @param {object} props
+ * @param {object} props.message 含 role、content、id、createdAt
+ * @param {boolean} [props.isStreaming=false] true 时显示输入指示 / 光标，隐藏工具栏
+ * @param {boolean} [props.isSelected=false]
+ * @param {boolean} [props.selectionMode=false] true 时点击行 toggle 勾选，长按无效
+ * @param {boolean} [props.isLastAssistant=false] 仅此时露出重新生成
+ * @param {boolean} [props.isLastUser=false] 仅此时露出就地编辑
+ * @param {boolean} [props.isSending=false] 发送中把重新生成标为 aria-disabled
+ * @param {function} [props.onCopy]
+ * @param {function} [props.onDelete]
+ * @param {function} [props.onRegenerate]
+ * @param {function} [props.onQuote]
+ * @param {function} [props.onEditSave] (message, trimmedText) 内容有变才调用
+ * @param {function} [props.onToggleSelect]
+ * @returns {JSX.Element}
+ */
 export default function ChatMessage({
   message,
   isStreaming = false,
@@ -84,7 +113,7 @@ export default function ChatMessage({
   }
   function commitEdit() {
     const trimmed = draft.trim()
-    if (!trimmed) return
+    if (!trimmed) return // 空内容不允许保存重发
     const original = String(message.content || '').trim()
     setEditing(false)
     setDraft('')
@@ -92,7 +121,7 @@ export default function ChatMessage({
     onEditSave?.(message, trimmed)
   }
   function handleEditKeyDown(event) {
-    if (event.nativeEvent?.isComposing) return
+    if (event.nativeEvent?.isComposing) return // 中文 IME 合成中的 Enter 不提交
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
       commitEdit()
@@ -114,10 +143,11 @@ export default function ChatMessage({
     longPressTimer.current = setTimeout(() => {
       longPressTriggered.current = true
       onToggleSelect?.(message)
+      // 短震动仅作进入多选的触觉反馈；无 Vibration API 或失败都忽略
       if (typeof window !== 'undefined' && navigator?.vibrate) {
         try { navigator.vibrate(15) } catch { /* ignore */ }
       }
-    }, 480)
+    }, 480) // 约半秒，短于系统文本选择长按
   }
   function cancelLongPress() {
     if (longPressTimer.current) {
@@ -132,6 +162,7 @@ export default function ChatMessage({
       return
     }
     if (longPressTriggered.current) {
+      // 长按刚触发的 pointerup+click 不再当单击处理，避免立刻再 toggle 一次
       longPressTriggered.current = false
     }
   }
@@ -249,6 +280,7 @@ export default function ChatMessage({
               <AiMessageContent content={message.content} isUser />
             ) : (
               <>
+                {/* 尚无 token 时显示「正在输入」；有内容后改用右侧闪烁光标 */}
                 {message.content
                   ? <AiMessageContent content={message.content} />
                   : isStreaming
