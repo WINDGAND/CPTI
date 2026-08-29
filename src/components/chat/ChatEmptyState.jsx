@@ -1,7 +1,15 @@
+/**
+ * AI 关系助手 · 空会话引导
+ *
+ * 无消息时展示四色光谱场景（冷静降温 / 日常相处 / 关系升级 / 自我看见），
+ * 每组 3 条可点提示词。点击后经 onPick 把原文交给输入条，不直接发消息。
+ * 不读写会话存储。
+ */
 import { motion } from 'framer-motion'
 import { ArrowUpRight, Compass, Flame, HeartHandshake, MessageCircleHeart } from 'lucide-react'
 import { useLanguage } from '../../i18n/LanguageContext'
 
+/** 四场景视觉：id 对 i18n key，accent 对齐亲密光谱四色（粉/蓝/紫/绿） */
 const SCENE_PALETTE = [
   { id: 'cooldown', labelKey: 'chat.empty_scene_cooldown', icon: Flame, accent: '#F4A7B0' },
   { id: 'daily', labelKey: 'chat.empty_scene_daily', icon: MessageCircleHeart, accent: '#76B8E0' },
@@ -9,6 +17,12 @@ const SCENE_PALETTE = [
   { id: 'self', labelKey: 'chat.empty_scene_self', icon: Compass, accent: '#8ED6B4' },
 ]
 
+/**
+ * 按当前报告上下文拼出四组提示词。
+ * @param {object} [context] 含 code、mode；缺 code 用 i18n 占位类型码
+ * @param {function} t i18n
+ * @returns {Array<{id: string, label: string, icon: object, accent: string, prompts: string[]}>}
+ */
 function buildScenes(context, t) {
   const code = context?.code || t('chat.empty_fallback_code')
   const isDual = context?.mode === 'dual'
@@ -29,6 +43,7 @@ function buildScenes(context, t) {
       prompts: [
         t('chat.empty_prompt_daily_1'),
         t('chat.empty_prompt_daily_2'),
+        // 日常第 3 条按单人/双人报告切换措辞，避免对单人用户说「你们」
         isDual ? t('chat.empty_prompt_daily_3_dual') : t('chat.empty_prompt_daily_3_single'),
       ],
     },
@@ -53,6 +68,15 @@ function buildScenes(context, t) {
   ]
 }
 
+/**
+ * 空会话场景引导（无消息时的提示词入口）
+ *
+ * @param {object} props
+ * @param {object} [props.context] 当前报告，含 code、mode（dual 为双人）
+ * @param {boolean} [props.disabled=false] 例如额度用尽时禁止点选
+ * @param {function} [props.onPick] 选中提示词原文；由父组件写入输入框，无本地副作用
+ * @returns {JSX.Element}
+ */
 export default function ChatEmptyState({ context, disabled = false, onPick }) {
   const { t } = useLanguage()
   const scenes = buildScenes(context, t)
