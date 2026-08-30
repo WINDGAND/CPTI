@@ -1,11 +1,28 @@
+/**
+ * 全站问题反馈弹层
+ *
+ * 从任意页打开后收集正文，连同当前 pathname 提交到 `/api/feedback-submit`。
+ * 提交中禁止关闭，避免半截请求；成功后切到确认视图，不再保留草稿。
+ * 不读写 localStorage；网络由 feedbackApi.submitFeedback（keepalive POST）完成。
+ */
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, CheckCircle } from 'lucide-react'
 import { submitFeedback } from '../../utils/feedbackApi'
 import { useLanguage } from '../../i18n/LanguageContext'
 
+/** 与服务端反馈正文上限对齐，输入时直接 slice，避免先超长再报错 */
 const MAX_LEN = 2000
 
+/**
+ * 反馈弹层：打开时复位表单；提交成功展示确认，失败留在表单并显示 errorMsg。
+ *
+ * @param {object} props
+ * @param {boolean} props.open 为 false 时不挂载面板（AnimatePresence 退场后卸载）
+ * @param {function} props.onClose 点遮罩、取消或关闭钮；status===submitting 时被拦截
+ * @returns {JSX.Element}
+ * 副作用：成功时 POST 反馈（含 pagePath）；不写会话 / 问卷存储
+ */
 export default function FeedbackModal({ open, onClose }) {
   const { t } = useLanguage()
   const [body, setBody] = useState('')
@@ -18,12 +35,12 @@ export default function FeedbackModal({ open, onClose }) {
       setBody('')
       setStatus('idle')
       setErrorMsg('')
-      // 延迟聚焦，等动画落定
+      // 延迟聚焦，等入场动画落定，避免移动端键盘抢焦点失败
       setTimeout(() => textareaRef.current?.focus(), 120)
     }
   }, [open])
 
-  // 关闭时等动画结束再重置，避免内容闪烁
+  // 提交中不允许关弹层，避免用户中断 keepalive 请求
   function handleClose() {
     if (status === 'submitting') return
     onClose()
@@ -32,6 +49,7 @@ export default function FeedbackModal({ open, onClose }) {
   async function handleSubmit(e) {
     e.preventDefault()
     const trimmed = body.trim()
+    // required 挡不住只含空白的提交
     if (!trimmed) return
 
     setStatus('submitting')
