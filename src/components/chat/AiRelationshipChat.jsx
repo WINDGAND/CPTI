@@ -1,3 +1,12 @@
+/**
+ * AI 关系助手 · 对话主界面
+ *
+ * 把最近一次测评（单人/双人 16 型）接到多会话聊天：发送、SSE 流式回填、停止、
+ * 编辑用户消息后重答、多选复制/分享/删除，以及桌面侧栏 / 移动端抽屉。
+ * 会话正文经 `aiChatSessions` 写入 localStorage；侧栏收起状态单独记
+ * `cpti_ai_sidebar_collapsed`。网络只走 `sendAiChatMessage`（`/api/ai-chat` SSE），
+ * 本组件不直接调用 DeepSeek。
+ */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
@@ -36,6 +45,14 @@ import ChatMessage from './ChatMessage'
 import ChatSessionDrawer from './ChatSessionDrawer'
 import ChatShareModal from './ChatShareModal'
 
+/**
+ * 把 `aiChatApi` 抛出的错误码转成 i18n 文案。
+ * `aborted` 返回空串：用户点停止时不弹错误条。
+ *
+ * @param {{ code?: string, status?: number }} error
+ * @param {function} t i18n
+ * @returns {string}
+ */
 function formatError(error, t) {
   if (error?.code === 'aborted') return ''
   if (error?.code === 'message-too-long' || error?.status === 400) return t('chat.err_too_long')
@@ -52,6 +69,13 @@ function formatError(error, t) {
   return t('chat.err_default')
 }
 
+/**
+ * 组装一条可写入会话的消息（id / role / content / ISO 时间）。
+ *
+ * @param {'user'|'assistant'} role
+ * @param {string} content
+ * @returns {{ id: string, role: string, content: string, createdAt: string }}
+ */
 function buildNewMessage(role, content) {
   return {
     id: genId(role),
@@ -61,6 +85,16 @@ function buildNewMessage(role, content) {
   }
 }
 
+/**
+ * AI 关系助手对话页：消息列表 + 输入条 + 会话抽屉。
+ *
+ * @param {object} props
+ * @param {object} props.resultData 最近测评结果，压缩成模型上下文
+ * @param {string} [props.themeClass='theme-blue'] 四大色系 class，传给分享海报
+ * @param {*} [props.toolbarLeft] 工具栏左侧插槽（如返回按钮）
+ * @returns {JSX.Element}
+ * 副作用：读写会话 localStorage、侧栏收起键；经 `sendAiChatMessage` POST `/api/ai-chat`
+ */
 export default function AiRelationshipChat({ resultData, themeClass = 'theme-blue', toolbarLeft = null }) {
   const { t } = useLanguage()
   const context = useMemo(() => buildAiRelationshipContext(resultData), [resultData])
@@ -192,6 +226,7 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
     if (!c) return
     function handleScroll() {
       const distance = c.scrollHeight - c.scrollTop - c.clientHeight
+      // 距底部超过约一屏内容才出「跳到最新」，避免轻轻上滑就闪浮标
       setShowJumpToBottom(distance > 240 && messages.length > 0)
     }
     c.addEventListener('scroll', handleScroll, { passive: true })
@@ -224,6 +259,7 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
     abortRef.current = controller
 
     try {
+      // 只把有正文的最近 8 条交给模型，控制 prompt 体积（与服务端历史窗口对齐）
       const requestMessages = baseMessages
         .filter((m) => m.content)
         .slice(-8)
@@ -248,6 +284,7 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
     } catch (err) {
       if (err?.code === 'aborted') {
         setMessages((cur) => {
+          // 尚未写出任何字就停：丢掉空占位，避免列表留下一条空白气泡
           const filtered = cur.filter((m) => !(m.id === assistantMessage.id && !m.content?.trim()))
           return filtered.map((m) => (
             m.id === assistantMessage.id && err.partial
@@ -380,9 +417,11 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
   }
   function handleQuote(message) {
     const snippet = String(message.content || '').replace(/\s+/g, ' ').trim()
+    // 引用条只展示一行摘要，超 280 字截断，避免把整段长回复塞进输入区
     setQuoteText(snippet.length > 280 ? `${snippet.slice(0, 280)}…` : snippet)
   }
   function handleRegenerate(message) {
+    // 只允许「最后一条助手消息」重答，避免从中间气泡分叉出另一条时间线
     const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant')
     if (lastAssistant?.id === message.id) regenerateLastAssistant()
   }
@@ -462,6 +501,7 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
   )
   const currentSession = sortedSessions.find((s) => s.id === currentSessionId)
   const sessionTitle = resolveSessionTitle(currentSession?.title, messages, t('chat.new_chat'))
+  // 多选且已勾消息时，分享海报只带勾选子集；否则分享整段会话
   const shareMessages = selectionMode && selectedIds.size > 0
     ? messages.filter((m) => selectedIds.has(m.id))
     : messages
@@ -695,6 +735,7 @@ export default function AiRelationshipChat({ resultData, themeClass = 'theme-blu
           ) : (
             <div className="mx-auto flex w-full max-w-3xl flex-col gap-3.5">
               {messages
+                // 流式占位可能尚无 content，仍要渲染以便显示光标；其余空正文跳过
                 .filter((m) => m.content || m.id === streamingMessageId)
                 .map((message) => (
                   <ChatMessage
