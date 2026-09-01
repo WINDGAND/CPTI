@@ -18,6 +18,7 @@ const STORAGE_KEY = 'cpti_lang'
 const SUPPORTED = ['zh', 'en']
 const DEFAULT_LANG = 'zh'
 
+/** 首屏语言：无 window / 隐私模式读失败 / 非法值一律回退默认中文。 */
 function readInitialLang() {
   if (typeof window === 'undefined') return DEFAULT_LANG
   try {
@@ -43,6 +44,7 @@ function getByPath(obj, path) {
   return cur
 }
 
+/** 替换 `{name}`；缺键或非自有属性则原样保留占位符，避免把原型链字段插进文案。 */
 function interpolate(template, vars) {
   if (typeof template !== 'string' || !vars) return template
   return template.replace(/\{(\w+)\}/g, (_, name) =>
@@ -56,6 +58,14 @@ const LanguageContext = createContext({
   t: (key) => key,
 })
 
+/**
+ * 根级 i18n Provider。把当前语言写入 localStorage，并同步 `<html lang>`。
+ *
+ * @param {object} props
+ * @param {*} props.children
+ * @returns {JSX.Element}
+ * 副作用：读写 localStorage('cpti_lang')；更新 document.documentElement.lang
+ */
 export function LanguageProvider({ children }) {
   const [lang, setLangState] = useState(readInitialLang)
 
@@ -79,7 +89,7 @@ export function LanguageProvider({ children }) {
     const dict = TRANSLATIONS[lang] || TRANSLATIONS[DEFAULT_LANG]
     let value = getByPath(dict, key)
     if (value === undefined) {
-      // 回退到中文，再回退到 fallback 或 key
+      // 当前语言缺键时回退中文，再回退到 options.fallback 或原 key
       const fallbackDict = TRANSLATIONS[DEFAULT_LANG]
       value = getByPath(fallbackDict, key)
     }
@@ -97,6 +107,12 @@ export function LanguageProvider({ children }) {
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>
 }
 
+/**
+ * 读取当前语言与翻译函数。Context 有默认值，Provider 外调用不会抛错，只会得到 no-op setLang。
+ *
+ * @returns {{ lang: 'zh' | 'en', setLang: function(string): void, t: function(string, object=): * }}
+ * 副作用：无（写存储发生在 LanguageProvider 的 setLang 之后）
+ */
 export function useLanguage() {
   return useContext(LanguageContext)
 }

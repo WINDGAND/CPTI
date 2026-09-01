@@ -1,3 +1,9 @@
+/**
+ * 帮助中心 FAQ 页（宏观模型题 + 微观流程题）
+ *
+ * 文案全部走 i18n；本文件只维护分组结构与「同时最多展开一项」的手风琴。
+ * 页脚 CTA 回调给 App，切回答题首页。
+ */
 import { useMemo, useState } from 'react'
 import { ChevronDown, ArrowRight } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -30,6 +36,15 @@ const FAQ_GROUP_DEFS = [
   },
 ]
 
+/**
+ * 把条目 id（如 q-what）映射到 i18n 键（q_what），读出题干 / 答案 / 行动建议。
+ * groupId 非 macro 一律当 micro，避免未知分组读到空键。
+ *
+ * @param {(key: string) => string} t
+ * @param {'macro' | 'micro'} groupId
+ * @param {string} id
+ * @returns {{ id: string, question: string, answer: string, action: string }}
+ */
 function getFaqItem(t, groupId, id) {
   const groupKey = groupId === 'macro' ? 'macro' : 'micro'
   const itemKeyMap = {
@@ -134,6 +149,14 @@ const sectionReveal = {
   transition: { duration: 0.5, ease: [0.16, 0.84, 0.34, 1] },
 }
 
+/**
+ * FAQ 列表页：默认展开第一题；再点已展开项则收起。
+ *
+ * @param {object} props
+ * @param {function(): void} props.onStartTest 页脚「开始测试」回调
+ * @returns {JSX.Element}
+ * 副作用：无 localStorage、无网络
+ */
 export default function FAQPage({ onStartTest }) {
   const { t } = useLanguage()
   const FAQ_GROUPS = useMemo(() => FAQ_GROUP_DEFS.map((group) => ({
@@ -147,6 +170,7 @@ export default function FAQPage({ onStartTest }) {
   const [expandedId, setExpandedId] = useState(firstItemId)
 
   function toggleItem(id) {
+    // 再点当前项收起，保证同时最多一项展开
     setExpandedId((prev) => (prev === id ? null : id))
   }
 
