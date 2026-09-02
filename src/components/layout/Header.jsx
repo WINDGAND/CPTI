@@ -1,3 +1,9 @@
+/**
+ * 全站顶栏：桌面居中浮岛导航 + 移动端底部 Tab。
+ *
+ * Logo 有 onLogoHome 时拦截 <a href="/"> 做 SPA 回首页，避免整页刷新。
+ * 「16 型」桌面悬停弹出四色分组预览；GitHub 入口仅 sm+，移动端由关于页兜底。
+ */
 import { useMemo, useState } from 'react'
 import { BarChart3, CircleHelp, Github, HeartHandshake, Home, MessageCircleHeart, MessageSquarePlus } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -29,17 +35,46 @@ const NAV_ITEM_DEFS = [
 const PILL_BASE =
   'rounded-full bg-base-card/90 backdrop-blur-md ring-1 ring-black/[0.04] shadow-[0_6px_24px_-12px_rgba(15,23,42,0.18)]'
 
+/**
+ * 导航可见文案：桌面优先 labelDesktopKey（AI 用更长短语），否则用短 labelKey。
+ *
+ * @param {{ labelKey: string, labelDesktopKey?: string }} item
+ * @param {(key: string) => string} t
+ * @param {{ desktop?: boolean }} [opts]
+ * @returns {string}
+ */
 function getNavDisplayLabel(item, t, { desktop = false } = {}) {
   if (desktop && item.labelDesktopKey) return t(item.labelDesktopKey)
   return t(item.labelKey)
 }
 
+/**
+ * 无障碍标签：featured 项（AI）优先 ariaLabelKey / 桌面长文案，避免只读到「AI」。
+ *
+ * @param {{ labelKey: string, labelDesktopKey?: string, ariaLabelKey?: string }} item
+ * @param {(key: string) => string} t
+ * @returns {string}
+ */
 function getNavAriaLabel(item, t) {
   if (item.ariaLabelKey) return t(item.ariaLabelKey)
   if (item.labelDesktopKey) return t(item.labelDesktopKey)
   return t(item.labelKey)
 }
 
+/**
+ * 站点 Header：按 activeTab 高亮桌面浮岛与底部 Tab。
+ *
+ * @param {object} props
+ * @param {string} props.activeTab 当前页 id：home | types | ai | stats | help
+ * @param {function(): void} [props.onNavigateHome]
+ * @param {function(): void} [props.onNavigateCoupleTypes]
+ * @param {function(): void} [props.onNavigateAI]
+ * @param {function(): void} [props.onNavigateStats]
+ * @param {function(): void} [props.onNavigateHelp]
+ * @param {function(): void} [props.onLogoHome] Logo 点击；缺省则走原生跳转
+ * @returns {JSX.Element}
+ * 副作用：反馈按钮打开 FeedbackContext；无 localStorage、无网络
+ */
 export default function Header({
   activeTab,
   onNavigateHome,
@@ -67,6 +102,7 @@ export default function Header({
   }, [RESULTS])
 
   function handleLogoClick(e) {
+    // 有 SPA 回调时拦住默认整页刷新
     if (onLogoHome) {
       e.preventDefault()
       onLogoHome()
