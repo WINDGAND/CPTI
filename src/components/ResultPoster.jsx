@@ -1,3 +1,10 @@
+/**
+ * 测评结果深度报告页（海报主体 + 邀请 / 昵称 / AI 导流）
+ *
+ * 双人模式展示关系光谱与双方主观视角；单人模式展示自我感知，并提供
+ * 「分享只读链接」与「生成双人邀请」两条裂变路径。
+ * 海报主体挂在 posterRef 上供 html2canvas 截图；截图区外的 CTA 不进入画布。
+ */
 import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
@@ -20,15 +27,6 @@ import { recordImageMetric } from '../utils/imageMetrics'
 import { createDualInvite } from '../utils/statsApi'
 import { useLanguage } from '../i18n/LanguageContext'
 import { useLocalizedResultByCode } from '../i18n/useLocalizedData'
-
-/**
- * ResultPoster — 多分节深度报告页（8 个分区）
- *
- * Props:
- *   result      — RESULTS_MAP 中对应记录
- *   percentages — { S, I, R, P, O, F, D, A }
- *   onRestart   — 重新测试回调
- */
 
 const DIMENSION_ROWS = Object.values(DIMENSION_DETAILS)
 
@@ -72,6 +70,13 @@ function Divider() {
   return <div className="result-divider" />
 }
 
+/**
+ * 把维度行文案切到当前语言；缺 key 时回退 scoring 模块里的中文标签。
+ *
+ * @param {(key: string, opts?: { fallback?: string }) => string} t
+ * @param {{ posKey: string, negKey: string, title: string, posLabel: string, negLabel: string }} row
+ * @returns {{ posKey: string, negKey: string, title: string, posLabel: string, negLabel: string }}
+ */
 function getLocalizedDim(t, row) {
   const k = `${row.posKey}${row.negKey}`
   return {
@@ -132,6 +137,14 @@ function renderSpectrum(percentages, t) {
   )
 }
 
+/**
+ * 结果页英雄图：优先 WebP，加载失败再试 PNG；两次都失败显示占位块。
+ * 成功 / 失败都会写入 window 上的图片指标（无 localStorage）。
+ *
+ * @param {object} props
+ * @param {string} props.code 四字母类型码
+ * @returns {JSX.Element}
+ */
 function ResultHeroIllustration({ code }) {
   const [src, setSrc] = useState(() => getTypeImageSources(code).webp)
   const [loaded, setLoaded] = useState(false)
@@ -160,6 +173,7 @@ function ResultHeroIllustration({ code }) {
   }
 
   function handleError() {
+    // 第一次失败切 PNG；第二次仍失败才标 broken，避免裂图
     if (!fallbackTried) {
       setFallbackTried(true)
       setSrc(getTypeImageSources(code).png)
@@ -207,6 +221,16 @@ function ResultHeroIllustration({ code }) {
   )
 }
 
+/**
+ * 结果报告页：渲染 8～10 个分区，并处理单人邀请 / 分享剪贴板。
+ *
+ * @param {object} props
+ * @param {object} props.resultData 计分产物（mode / perception / relationship / alignment / players）
+ * @param {function(): void} props.onRestart 重新测试
+ * @param {function(): void} [props.onOpenAi] 打开 AI 关系助手
+ * @returns {JSX.Element}
+ * 副作用：单人邀请会 POST 创建双人邀请；写入剪贴板；图片指标记入 window；无 localStorage
+ */
 export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
   const { t } = useLanguage()
   const posterRef = useRef(null)
@@ -221,6 +245,7 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
   const isDualMode = resultData.mode === 'dual'
   const perception = resultData.perception
   const relationship = resultData.relationship
+  // 双人取关系光谱，单人取自我感知；后续分区都围绕这份主档案
   const primaryProfile = isDualMode ? relationship : perception
   const rawResult = primaryProfile.result
   // 用 i18n hook 选当前语言对应的 result 文案；如果取不到，fallback 到原始（中文）数据
@@ -235,7 +260,9 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
 
   const n1 = nickname1.trim() || t('result.nickname_default_other')
   const n2 = nickname2.trim() || t('result.nickname_default_self')
+  // 单人「生成报告」要求先填自己的昵称；空格不算已填
   const canGenerateSinglePoster = nickname2.trim().length > 0
+  // 从双人预览链进来的单人结果：SSR / 非法 URL 一律当普通单人，避免抛错
   const fromDualPreview = (() => {
     if (typeof window === 'undefined') return false
     try {
@@ -258,10 +285,15 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
   }, [shareCopied])
 
   function handleGenerate() {
+    // 单人未填自己昵称时直接跳过，避免滚回顶部却看不到个性化标题
     if (!isDualMode && !canGenerateSinglePoster) return
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  /**
+   * 单人 → 双人邀请：用当前作答创建 24h 邀请，链接缓存后写入剪贴板。
+   * 无 clipboard API 或写入失败时退到 prompt。缺 sourceAnswers 则静默返回。
+   */
   async function handleCopySingleInvite() {
     if (!isDualMode && !perception?.sourceAnswers) return
 
@@ -299,6 +331,10 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
     }
   }
 
+  /**
+   * 单人只读分享链：纯前端编解码，不打邀请接口。双人或无作答时跳过。
+   * 剪贴板失败同样退到 prompt，保证用户总能拿到链接。
+   */
   async function handleCopySingleShareLink() {
     if (isDualMode || !perception?.sourceAnswers) return
     let link = ''
@@ -413,6 +449,7 @@ export default function ResultPoster({ resultData, onRestart, onOpenAi }) {
                   {isDualMode ? t('result.intro_dual_title') : t('result.intro_single_title')}
                 </p>
                 <p className="result-prose-muted mt-2">
+                  {/* 该类型未配 introByMode 时用通用兜底，避免简介空白 */}
                   {resultIntro ?? (isDualMode
                     ? t('result.intro_dual_fallback')
                     : t('result.intro_single_fallback'))}
