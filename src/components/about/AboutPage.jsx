@@ -1,3 +1,9 @@
+/**
+ * 关于 CPTI：模型由来、四大维度、使用建议与免责声明。
+ *
+ * 文案全部走 i18n（help.* 键）；页内 CTA 回调给 App 开测或滚到 FAQ。
+ * 页脚外链到 GitHub 仓库，本文件不读写 localStorage、不发网络请求。
+ */
 import { motion } from 'framer-motion'
 import { ArrowRight, BookOpenText, Compass, Github, HeartHandshake, ShieldCheck } from 'lucide-react'
 import { useLanguage } from '../../i18n/LanguageContext'
@@ -14,6 +20,12 @@ const sectionReveal = {
 // 四大 CPTI 维度各对应一个品牌色，替代统一 brand-cyan
 const DIMENSION_ACCENTS = ['#F4A7B0', '#76B8E0', '#B8A0D0', '#8ED6B4']
 
+/**
+ * 把四大维度的 i18n 标题/说明配上分区强调色（蜜桃粉 / 湖水蓝 / 罗兰紫 / 薄荷绿）。
+ *
+ * @param {(key: string) => string} t
+ * @returns {{ code: string, title: string, desc: string, accent: string }[]}
+ */
 function getDimensions(t) {
   return [
     { code: 'S / I', title: t('dim.SI.title'), desc: t('dim.SI.desc'), accent: DIMENSION_ACCENTS[0] },
@@ -69,6 +81,15 @@ function EditorialSection({ icon: Icon, eyebrow, title, accent = '#4298b4', chil
   )
 }
 
+/**
+ * 关于页：双列编辑物专栏 + 顶底「开始测试」入口。
+ *
+ * @param {object} props
+ * @param {function(): void} props.onStartTest 切到答题首页
+ * @param {function(): void} props.onGoFAQ 帮助页滚回 FAQ 区块（由 HelpPage 传入）
+ * @returns {JSX.Element}
+ * 副作用：无 localStorage、无网络
+ */
 export default function AboutPage({ onStartTest, onGoFAQ }) {
   const { t } = useLanguage()
   const DIMENSIONS = getDimensions(t)
