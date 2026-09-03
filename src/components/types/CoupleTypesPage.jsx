@@ -1,3 +1,9 @@
+/**
+ * 16 种情侣类型总览：按四大色系全宽色带排列，点击插图打开灯箱。
+ *
+ * 插图优先 WebP、失败回退 PNG；首屏 4 张 eager，其余 lazy。
+ * 文案走 i18n；本页不读写 localStorage。
+ */
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowRight } from 'lucide-react'
@@ -30,6 +36,15 @@ function StartTestButton({ onClick, label }) {
   )
 }
 
+/**
+ * 类型卡插图：优先 WebP，加载失败再试 PNG；两次都失败显示占位块。
+ * 成功 / 失败都会写入 window 上的图片指标（无 localStorage）。
+ *
+ * @param {object} props
+ * @param {string} props.code 四字母类型码
+ * @param {boolean} [props.priority=false] 为首屏卡时 eager + high fetchpriority
+ * @returns {JSX.Element}
+ */
 function TypeIllustration({ code, priority = false }) {
   const sources = getTypeImageSources(code)
   const [src, setSrc] = useState(sources.webp)
@@ -59,6 +74,7 @@ function TypeIllustration({ code, priority = false }) {
   }
 
   function handleError() {
+    // 第一次失败切 PNG；第二次仍失败才标 broken，避免裂图
     if (!fallbackTried) {
       setFallbackTried(true)
       setSrc(getTypeImageSources(code).png)
@@ -107,7 +123,12 @@ function TypeIllustration({ code, priority = false }) {
 }
 
 /**
- * 情侣类型总览页：全宽色带、居中文案、斜切衔接、public/images/cpti/{CODE}.png
+ * 情侣类型总览页：色带斜切衔接、系列水印、点击插图打开 TypeImageLightbox。
+ *
+ * @param {object} props
+ * @param {function(): void} props.onStartTest 页头/页脚 CTA，切回答题首页
+ * @returns {JSX.Element}
+ * 副作用：插图加载会 recordImageMetric；无 localStorage、无业务网络请求
  */
 export default function CoupleTypesPage({ onStartTest }) {
   const { t } = useLanguage()
@@ -141,6 +162,7 @@ export default function CoupleTypesPage({ onStartTest }) {
           const types = byGroup[groupCode] ?? []
           const isFirstBand = index === 0
           const angled = index > 0
+          // 偶数带反向斜切，色带左右交错咬合
           const angleFlip = index % 2 === 0
           const angleClass = angled
             ? angleFlip
@@ -160,6 +182,7 @@ export default function CoupleTypesPage({ onStartTest }) {
               style={{
                 zIndex: index + 1,
                 backgroundColor: `color-mix(in srgb, ${meta.accent} 18%, white)`,
+                // 首屏色带始终渲染；其余用 content-visibility 跳过屏外布局，900px 作预估高度防跳动
                 contentVisibility: index === 0 ? 'visible' : 'auto',
                 containIntrinsicSize: index === 0 ? undefined : '900px',
               }}
@@ -215,6 +238,7 @@ export default function CoupleTypesPage({ onStartTest }) {
                       >
                         <TypeIllustration
                           code={type.code}
+                          // 仅第一色带前 4 张 eager，避免 16 张同时抢带宽
                           priority={index === 0 && itemIdx < 4}
                         />
                       </button>
