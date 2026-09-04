@@ -37,6 +37,10 @@ const DIMENSION_LETTERS = {
   DA: ['D', 'A'],
 }
 
+/**
+ * 各维度展示元数据（中文标题 + 正负向字母/短标签）。
+ * 问卷预览条与双人契合度模块共用；纯静态表，无副作用。
+ */
 export const DIMENSION_DETAILS = {
   SI: { title: '空间距离', posKey: 'S', negKey: 'I', posLabel: '黏人', negLabel: '独立' },
   RP: { title: '情感表达', posKey: 'R', negKey: 'P', posLabel: '仪式感', negLabel: '务实' },
@@ -110,7 +114,7 @@ export function determineType(dimensionScores, questionsPerDimension) {
     const clamped = Math.max(-max, Math.min(max, score))
 
     const posPercent = max === 0
-      ? 50
+      ? 50 // 题数为 0 时避免除零，中性各 50%
       : Math.round(((clamped + max) / (2 * max)) * 100)
     const negPercent = 100 - posPercent
 
@@ -156,18 +160,21 @@ function averageDimensionScores(scoresA, scoresB) {
   return Object.fromEntries(
     Object.keys(DIMENSION_LETTERS).map((dim) => [
       dim,
+      // 四舍五入成整数，后续 determineType 的 ≥0 判定与单人路径一致
       Math.round(((scoresA[dim] ?? 0) + (scoresB[dim] ?? 0)) / 2),
     ])
   )
 }
 
 function computeAlignment(scoresA, scoresB, questionsPerDimension) {
+  // 单人每维满分 max=题数×3，两人分处正负两端时 gap=2×max，故 ×6
   const maxGap = questionsPerDimension * 6
   const dimensions = Object.fromEntries(
     Object.entries(DIMENSION_DETAILS).map(([dim, meta]) => {
       const scoreA = scoresA[dim] ?? 0
       const scoreB = scoresB[dim] ?? 0
       const gap = Math.abs(scoreA - scoreB)
+      // 题数为 0 时视为完全契合，避免除零
       const consensus = maxGap === 0 ? 100 : Math.round((1 - gap / maxGap) * 100)
 
       return [dim, {
@@ -189,6 +196,18 @@ function computeAlignment(scoresA, scoresB, questionsPerDimension) {
   }
 }
 
+/**
+ * 单人速通：归一化作答后计分，得到「我眼中的我们」感知档案。
+ *
+ * @param {Array} questions 题库（含 dimension / polarity）
+ * @param {Array|{[questionId: string]: number}} rawAnswers 数组或 `{ qId: selectedIndex }` 映射
+ * @param {number} questionsPerDimension 每维题数（决定百分比分母）
+ * @returns {{ mode: 'single', perception: {
+ *   code: string, percentages: object, result: object|undefined,
+ *   dimensionScores: object, sourceAnswers: object
+ * } }}
+ * 无副作用（不读写存储、不发网络）。
+ */
 export function computeSingleModeResult(questions, rawAnswers, questionsPerDimension) {
   const answers = Array.isArray(rawAnswers) ? rawAnswers : normalizeAnswers(rawAnswers)
   const dimensionScores = calculateDimensionScores(questions, answers)
@@ -205,6 +224,24 @@ export function computeSingleModeResult(questions, rawAnswers, questionsPerDimen
   }
 }
 
+/**
+ * 双人拼图：两人各自计分；关系档案取四维得分算术平均，并给出契合度。
+ *
+ * @param {Array} questions 题库
+ * @param {Array} rawAnswerSets `[playerA, playerB]`，每项形态同单人 `rawAnswers`
+ * @param {number} questionsPerDimension 每维题数
+ * @returns {{
+ *   mode: 'dual',
+ *   players: Array,
+ *   relationship: object,
+ *   alignment: {
+ *     dimensions: object,
+ *     mostAlignedDimension: object,
+ *     mostMisalignedDimension: object
+ *   }
+ * }}
+ * `alignment.consensus` 为 0–100（gap=0 → 100；gap=maxGap → 0）。无副作用。
+ */
 export function computeDualModeResult(questions, rawAnswerSets, questionsPerDimension) {
   const [playerARaw = {}, playerBRaw = {}] = rawAnswerSets
   const playerAAnswers = Array.isArray(playerARaw) ? playerARaw : normalizeAnswers(playerARaw)
