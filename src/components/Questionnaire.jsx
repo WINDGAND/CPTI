@@ -37,6 +37,10 @@ function getFirstMissingIndex(answers) {
   return QUESTIONS.findIndex((question) => !(question.id in (answers || {})))
 }
 
+/**
+ * 按草稿里「已答过的最大题号」决定揭开数量，保证跳题后仍能看见最远那一题。
+ * 下限 INITIAL_COUNT，避免空草稿只露出 0 题。
+ */
 function getRevealCountByAnswers(answers, total) {
   const answeredQuestionIds = new Set(Object.keys(answers || {}))
   let maxAnsweredIdx = -1
@@ -100,13 +104,19 @@ function renderPreviewSpectrum(percentages, t) {
 }
 
 /**
- * Questionnaire — 完整答题流程（PRD 3.2.1 / 3.1）
+ * 问卷主流程（PRD 3.2.1 / 3.1）：模式选择 + 32 题李克特作答 + 双人邀请接力。
  *
- * 第 0 题（模式选择）与正式题目视觉完全一致，共同列在同一列表中。
- * 进度条始终 sticky 可见，从 0% 推进到 100%。
+ * 第 0 题（单人速通 / 双人拼图）与正式题目同列表；进度条 sticky，0%→100%。
+ * 题目从 INITIAL_COUNT 揭开，哨兵 IntersectionObserver 与触底再各加 LOAD_STEP 道。
  *
- * Props:
- *   onComplete(answers: { [qId]: selectedIndex }) — 答完后回调给 App
+ * 副作用：
+ *   - localStorage 草稿：hydration 完成后 debounce 写入；重置/答完时清除
+ *   - 双人邀请：probe / create / consume（statsApi）；探测后 replaceState 去掉 invite 查询串
+ *   - 复制邀请链接触发 clipboard（不支持或失败则 window.prompt）
+ *
+ * @param {{ onComplete: (payload: { mode: 'single'|'dual', answers: object|Array }) => void }} props
+ *   onComplete — 单人传 `{ [qId]: selectedIndex }`；双人传 `[answersA, answersB]`。
+ *   本组件不跑计分、不提交统计；由 App.handleQuizComplete 承接。
  */
 export default function Questionnaire({ onComplete }) {
   const { t } = useLanguage()
@@ -330,6 +340,7 @@ export default function Questionnaire({ onComplete }) {
     }, 200)
   }
 
+  // 首屏 hydration：URL 邀请优先于本地草稿。邀请探测无论成败都剥掉查询串，避免刷新重复消耗。
   useEffect(() => {
     const parsed = readDualInviteFromSearch()
 
@@ -399,6 +410,7 @@ export default function Questionnaire({ onComplete }) {
   useEffect(() => {
     if (!hydrationDone) return undefined
 
+    // 邀请等待页可能 0 题已答，仍要靠 token/link 把草稿撑住，刷新才不会丢预览
     const hasDraftContent =
       modeChosen ||
       answeredCount > 0 ||
@@ -450,9 +462,11 @@ export default function Questionnaire({ onComplete }) {
       try {
         const link = createSingleShareLink(QUESTIONS, nextAnswers)
         const url = new URL(link)
+        // ResultPoster 读此标记，按「双人预览打开的单人报告」展示，而不是正式单人结果
         url.searchParams.set('fromDualPreview', '1')
         return url.toString()
       } catch {
+        // 分享链编码失败时隐藏「打开单人报告」，不影响邀请主路径
         return ''
       }
     })()
@@ -504,6 +518,7 @@ export default function Questionnaire({ onComplete }) {
   }
 
   function requestModeChange(nextMode) {
+    // 已答 ≥5 题才弹确认，避免刚点错模式就被打断
     if (answeredCount >= RESTART_CONFIRM_THRESHOLD) {
       openRestartConfirm(nextMode === 'single' ? 'switch-single' : 'switch-dual', answeredCount)
       return
@@ -572,6 +587,7 @@ export default function Questionnaire({ onComplete }) {
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(inviteLink)
       } else {
+        // 非安全上下文没有 clipboard API，退回可选中的 prompt
         window.prompt(t('quiz.invite_clipboard_prompt'), inviteLink)
       }
       setInviteCopied(true)
@@ -606,6 +622,7 @@ export default function Questionnaire({ onComplete }) {
       ))
       setDualAnswerSets(nextSets)
 
+      // 第一位答完：只建邀请、停在预览，不调用 onComplete
       if (activePlayerIdx === 0) {
         setCompletionError('')
         const preview = buildDualPlayer1Preview(nextAnswers)
@@ -634,6 +651,7 @@ export default function Questionnaire({ onComplete }) {
         return true
       }
 
+      // 第二位答完：消费邀请拿到 answersA，再与本地 answersB 一并交给 App
       if (!inviteToken) {
         setCompletionError(t('quiz.invite_state_anomaly'))
         return true
