@@ -1,3 +1,9 @@
+/**
+ * AI 关系助手解锁页：无完整测评结果时，在首页 AI Tab 展示能力说明并引导开测。
+ *
+ * 有结果时由 App 直接进 AiRelationshipPage，本页不会渲染。
+ * 文案走 i18n（ai.*）；本文件不读写 localStorage、不发网络请求。
+ */
 import { motion } from 'framer-motion'
 import { ArrowRight, MessageCircleHeart, Sparkles } from 'lucide-react'
 import { useLanguage } from '../../i18n/LanguageContext'
@@ -5,6 +11,14 @@ import { useLanguage } from '../../i18n/LanguageContext'
 // 恋爱四色（替代原 MBTI 工具色序号），与空状态/分享海报同一套光谱语言
 const FEATURE_ACCENTS = ['#F4A7B0', '#76B8E0', '#B8A0D0']
 
+/**
+ * 解锁说明：三列能力要点 + CTA 回问卷开测。
+ *
+ * @param {object} props
+ * @param {function(): void} props.onStartTest 切到答题首页
+ * @returns {JSX.Element}
+ * 副作用：无 localStorage、无网络
+ */
 export default function AiUnlockPage({ onStartTest }) {
   const { t } = useLanguage()
   const FEATURES = [
