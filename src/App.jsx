@@ -21,17 +21,29 @@ import { useLanguage } from './i18n/LanguageContext'
 const ResultPoster = lazy(() => import('./components/ResultPoster'))
 const CoupleTypesPage = lazy(() => import('./components/types/CoupleTypesPage'))
 
+/**
+ * 从 localStorage 读取最近一次完整结果，仅 status==='ready' 时作为初始 resultData。
+ * @returns {object|null}
+ */
 function getInitialStoredResult() {
   const stored = readStoredResult()
   return stored.status === 'ready' ? stored.resultData : null
 }
 
+/**
+ * 深链 hash 为 #ai 且本地已有完整结果时，启动即进入 AI 独立页。
+ * @returns {boolean}
+ */
 function shouldOpenAiFromHash() {
   return typeof window !== 'undefined'
     && window.location.hash === '#ai'
     && readStoredResult().status === 'ready'
 }
 
+/**
+ * 深链 #ai 但尚无完整结果时，停在首页 AI 解锁 Tab，避免空白独立页。
+ * @returns {'ai'|'quiz'}
+ */
 function getInitialMainTab() {
   if (typeof window !== 'undefined' && window.location.hash === '#ai' && readStoredResult().status !== 'ready') {
     return 'ai'
@@ -39,6 +51,10 @@ function getInitialMainTab() {
   return 'quiz'
 }
 
+/**
+ * 用 replaceState 改写 location.hash，不新增历史记录、不改动 pathname/search。
+ * @param {string} [hash]
+ */
 function replaceLocationHash(hash = '') {
   if (typeof window === 'undefined') return
   const nextUrl = `${window.location.pathname}${window.location.search}${hash}`
@@ -46,7 +62,7 @@ function replaceLocationHash(hash = '') {
 }
 
 /**
- * App — 顶层视图路由
+ * App — 顶层视图路由与测评完成后的计分 / 埋点入口。
  *
  * view:
  *   'home'    — 首页（问卷 或 情侣类型页）
@@ -60,6 +76,13 @@ function replaceLocationHash(hash = '') {
  *   'ai'    — AI 关系助手解锁说明
  *   'stats' — 统计总览
  *   'help'  — 常见问题 + 关于 CPTI
+ *
+ * 副作用：
+ *   - localStorage：启动读 readStoredResult；答完写 saveStoredResult；重置/答完清 clearQuizDraft
+ *   - 网络：submitStats / submitTelemetry（失败静默，不阻断进 Loading）
+ *   - URL：#ai 深链；单人分享查询串 hydrate 后 replaceState 剥离
+ *
+ * @returns {JSX.Element}
  */
 export default function App() {
   const { t } = useLanguage()
@@ -88,6 +111,7 @@ export default function App() {
 
   function goAiAssistant() {
     const stored = resultData ? { status: 'ready', resultData } : readStoredResult()
+    // 已有完整结果：进独立 AI 页；否则停在首页解锁说明，避免空白对话
     if (stored.status === 'ready') {
       setResultData(stored.resultData)
       setView('ai')
@@ -146,6 +170,7 @@ export default function App() {
       window.history.replaceState({}, '', stripSingleShareFromUrl())
       window.scrollTo({ top: 0, behavior: 'instant' })
     } catch {
+      // 分享串非法或计分失败：仍剥离查询参数，避免刷新反复进入坏链
       window.history.replaceState({}, '', stripSingleShareFromUrl())
     }
   }, [])
@@ -165,6 +190,7 @@ export default function App() {
     }
 
     if (payload.mode === 'dual') {
+      // 双人各交一份匿名作答，服务端按题目/维度聚合，不关联两人身份
       const [answersA = {}, answersB = {}] = Array.isArray(payload.answers) ? payload.answers : []
       const playerA = computed.players?.[0]
       const playerB = computed.players?.[1]
@@ -222,6 +248,7 @@ export default function App() {
 
   function goResultFromAi() {
     const stored = resultData ? { status: 'ready', resultData } : readStoredResult()
+    // 内存/本地都没有完整结果时退回解锁 Tab，而不是空海报
     if (stored.status === 'ready') {
       setResultData(stored.resultData)
       setView('result')
