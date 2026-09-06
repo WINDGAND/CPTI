@@ -15,6 +15,12 @@ const OPTIONS = [
  * 视觉：圆角药丸 + 半透明白底 + 微弱描边 + 柔和投影，
  * 与 Header 内现有 PILL_BASE 视觉语言对齐；展开下拉时使用
  * portal 渲染到 body，避免被祖先 backdrop-filter 影响。
+ *
+ * @param {object} props
+ * @param {boolean} [props.compact=false] 移动端收成 36px 圆形；桌面仍展开文案
+ * @returns {JSX.Element}
+ * 副作用：点选项走 LanguageContext.setLang（Provider 写 localStorage + html lang）；
+ *   本文件不直接读写存储、不发网络。菜单经 Portal 挂到 document.body。
  */
 export default function LanguageSwitcher({ compact = false }) {
   const { lang, setLang, t } = useLanguage()
@@ -54,6 +60,7 @@ export default function LanguageSwitcher({ compact = false }) {
     const MENU_W = 168
     const MENU_H = 132
     const GAP = 8
+    // 默认右对齐触发器；贴边时夹进视口，避免被裁切
     let left = rect.right - MENU_W
     if (left < GAP) left = GAP
     if (left + MENU_W > window.innerWidth - GAP) {
@@ -61,6 +68,7 @@ export default function LanguageSwitcher({ compact = false }) {
     }
     let top = rect.bottom + GAP
     if (top + MENU_H > window.innerHeight - GAP) {
+      // 下方空间不够则翻到触发器上方
       top = Math.max(GAP, rect.top - MENU_H - GAP)
     }
     setPos({ top, left })
