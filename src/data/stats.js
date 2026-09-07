@@ -1,6 +1,18 @@
+/**
+ * CPTI 统计页的前端演示样本（模块加载时算一次，无网络、无 localStorage）
+ *
+ * 职责：
+ *   - 用 16 型预设百分比，把 TOTAL_SUBMISSIONS 拆成整数人次（最大余数法）
+ *   - 再按色系（类型码前两字母 SR/SP/IR/IP）汇总四色分布
+ *   - 导出 Top3 / Bottom3 与 insights 文案，供 StatsPage 在接口未就绪时展示
+ *
+ * 注意：这是阶段性演示数据；线上真实汇总走 /api/stats-summary。
+ * 英文标签备份见 stats.en.js，不算本文件职责。
+ */
 import { RESULTS_MAP } from './results'
 import { TYPE_GROUP_META } from './typeGroups'
 
+/** 16 型演示占比（合计 100）；顺序与 TYPE_CODES 四大色系一致 */
 const BASE_TYPE_PERCENTAGES = [
   { code: 'SROD', percent: 10.8 },
   { code: 'SROA', percent: 8.4 },
@@ -20,6 +32,16 @@ const BASE_TYPE_PERCENTAGES = [
   { code: 'IPFA', percent: 4.8 },
 ]
 
+/**
+ * 按百分比把总人次拆成整数（Hamilton / 最大余数法）
+ *
+ * 先对每型 floor(total × percent / 100)，再把「总和缺口」按小数部分从大到小各补 1，
+ * 保证各型 count 之和严格等于 total（避免四舍五入后对不齐总人次）。
+ *
+ * @param {number} total 演示用总提交人次
+ * @param {Array<{code: string, percent: number}>} rows 16 型百分比表
+ * @returns {Array<{code: string, percent: number, count: number, title: string, group: string}>}
+ */
 function computeCountsByPercent(total, rows) {
   const withRaw = rows.map((row) => {
     const raw = (total * row.percent) / 100
@@ -30,6 +52,7 @@ function computeCountsByPercent(total, rows) {
   let used = withRaw.reduce((sum, row) => sum + row.count, 0)
   const missing = total - used
 
+  // floor 后总和一定 ≤ total；缺口按余数从大到小轮询 +1
   if (missing > 0) {
     const sorted = [...withRaw].sort((a, b) => b.remainder - a.remainder)
     for (let i = 0; i < missing; i += 1) {
@@ -49,6 +72,12 @@ function computeCountsByPercent(total, rows) {
   })
 }
 
+/**
+ * 把 16 型人次按色系（code 前两字母）加总成四色分布，并补上色系中文名与强调色
+ *
+ * @param {Array<{group: string, percent: number, count: number}>} typeDistribution
+ * @returns {Array<{group: string, percent: number, count: number, label: string, accent: string}>}
+ */
 function buildGroupDistribution(typeDistribution) {
   const grouped = typeDistribution.reduce((acc, item) => {
     if (!acc[item.group]) {
@@ -71,6 +100,24 @@ const typeDistribution = computeCountsByPercent(TOTAL_SUBMISSIONS, BASE_TYPE_PER
 const groupDistribution = buildGroupDistribution(typeDistribution)
 const sortedByPercent = [...typeDistribution].sort((a, b) => b.percent - a.percent)
 
+/**
+ * 统计页静态演示包：人次、色系、Top3/Bottom3、洞察文案。
+ *
+ * Bottom3 先 slice(-3) 再 reverse，让最稀有的排在数组末位展示为「最末」。
+ *
+ * @type {{
+ *   totalSubmissions: number,
+ *   lastUpdated: string,
+ *   sourceNote: string,
+ *   typeDistribution: object[],
+ *   groupDistribution: object[],
+ *   top3: object[],
+ *   bottom3: object[],
+ *   insights: object[],
+ *   cuteTags: string[],
+ * }}
+ * 副作用：无；只是模块级常量
+ */
 export const STATS_DATA = {
   totalSubmissions: TOTAL_SUBMISSIONS,
   lastUpdated: '2026-04-14',
