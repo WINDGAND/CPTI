@@ -4,6 +4,15 @@
  * 加载中用骨架/占位条；失败可点重试（递增 retryCount 重新拉数）。
  * 远端 title / 色系 label / cuteTags / insights 会按当前语言改写；
  * 英文 insight 不直接翻译对象，而是按分布位次现算文案。
+ *
+ * 页面自上而下分为五段：
+ * 1. 头部——累计份数（0 → 目标值的滚动数字）与趣味标签；
+ * 2. 类型分布——16 型甜甜圈 + 排名列表（可按「占比 / 人数」切换排序口径）；
+ * 3. 色系占比与数据洞察（左右两栏，滚入视口时渐显）；
+ * 4. Top3 / Bottom3 榜单（左右两栏）；
+ * 5. 页脚——开始测试 / 查看 16 型两个行动入口。
+ *
+ * 本页是纯只读视图：只 GET 汇总接口，不写入任何测评结果。
  */
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
@@ -21,6 +30,11 @@ const TYPE_COLORS = [
   '#8ED6B4', '#6FC79D', '#54B888', '#AEE0C8', // 薄荷绿系
 ]
 
+// 以下四组为加载中 / 失败时的占位骨架数据：结构与真实数据保持一致，
+// 这样渲染分支只需判断 hasData，不必为缺数据单独写一套 DOM。
+// key 前缀刻意与真实 code 区分，避免 React 复用真实数据的节点导致闪烁。
+
+// 16 型排名列表占位（真实 16 型，此处只铺 8 行足够撑起首屏高度）
 const PLACEHOLDER_RANKED = Array.from({ length: 8 }, (_, index) => ({
   code: '--',
   title: '--',
@@ -29,6 +43,7 @@ const PLACEHOLDER_RANKED = Array.from({ length: 8 }, (_, index) => ({
   key: `placeholder-ranked-${index}`,
 }))
 
+// 四大色系占比占位（桃 / 天蓝 / 紫 / 薄荷，与真实数据条数一致）
 const PLACEHOLDER_GROUPS = Array.from({ length: 4 }, (_, index) => ({
   group: `g-${index}`,
   label: '--',
@@ -37,6 +52,7 @@ const PLACEHOLDER_GROUPS = Array.from({ length: 4 }, (_, index) => ({
   accent: '#E5E7EB',
 }))
 
+// Top3 / Bottom3 榜单占位（两份榜单共用，各 3 行）
 const PLACEHOLDER_TOP_BOTTOM = Array.from({ length: 3 }, (_, index) => ({
   code: '--',
   title: '--',
@@ -44,6 +60,7 @@ const PLACEHOLDER_TOP_BOTTOM = Array.from({ length: 3 }, (_, index) => ({
   key: `placeholder-top-bottom-${index}`,
 }))
 
+// 数据洞察占位（远端固定返回 3 条：最高占比 / 最低占比 / 色系分布）
 const PLACEHOLDER_INSIGHTS = Array.from({ length: 3 }, (_, index) => ({
   title: '--',
   value: '--',
@@ -51,6 +68,13 @@ const PLACEHOLDER_INSIGHTS = Array.from({ length: 3 }, (_, index) => ({
   key: `placeholder-insight-${index}`,
 }))
 
+/**
+ * 按语种格式化整数：千分位分隔（zh-CN 用逗号，en-US 也是逗号但分组习惯一致）。
+ *
+ * @param {number} value 待格式化的数值（份数 / 人数）
+ * @param {string} [locale='zh-CN'] BCP 47 语言标签，由调用方按当前语言传入
+ * @returns {string} 已插入千分位的字符串
+ */
 function formatNumber(value, locale = 'zh-CN') {
   return new Intl.NumberFormat(locale).format(value)
 }
@@ -63,6 +87,17 @@ const sectionReveal = {
   transition: { duration: 0.5, ease: [0.16, 0.84, 0.34, 1] },
 }
 
+/**
+ * 数字滚动组件：挂载 / target 变化时，用 requestAnimationFrame 在 1s 内从 0 线性插值到目标值。
+ *
+ * 之所以用 rAF 而不是 CSS 或定时器：rAF 与浏览器重绘同频，帧率自适应，
+ * 页面不可见时自动暂停，不会空转消耗 CPU。
+ *
+ * @param {{ target: number, locale?: string }} props
+ * @param {number} props.target 目标数值（累计份数）
+ * @param {string} [props.locale='zh-CN'] 千分位格式化所用的语言标签
+ * @returns {JSX.Element} 已格式化的当前中间值
+ */
 function CountUpNumber({ target, locale = 'zh-CN' }) {
   const [display, setDisplay] = useState(0)
 
@@ -80,12 +115,21 @@ function CountUpNumber({ target, locale = 'zh-CN' }) {
     }
 
     raf = requestAnimationFrame(tick)
+    // 卸载或 target 变化时取消上一轮动画，防止对已卸载组件 setState
     return () => cancelAnimationFrame(raf)
   }, [target])
 
   return <span>{formatNumber(display, locale)}</span>
 }
 
+/**
+ * 主行动按钮（实心填充）：右侧带箭头图标，用于页脚的「开始测试」。
+ *
+ * @param {{ children: React.ReactNode, onClick?: function }} props
+ * @param {React.ReactNode} props.children 按钮文案
+ * @param {function} [props.onClick] 点击回调
+ * @returns {JSX.Element}
+ */
 function PrimaryButton({ children, onClick }) {
   return (
     <button
@@ -99,6 +143,14 @@ function PrimaryButton({ children, onClick }) {
   )
 }
 
+/**
+ * 次级按钮（描边幽灵样式）：hover 时填充品牌色，用于页脚的「查看 16 型」。
+ *
+ * @param {{ children: React.ReactNode, onClick?: function }} props
+ * @param {React.ReactNode} props.children 按钮文案
+ * @param {function} [props.onClick] 点击回调
+ * @returns {JSX.Element}
+ */
 function GhostButton({ children, onClick }) {
   return (
     <button
@@ -111,6 +163,17 @@ function GhostButton({ children, onClick }) {
   )
 }
 
+/**
+ * 极坐标转笛卡尔坐标（甜甜圈扇区的顶点计算底座）。
+ *
+ * 角度以「12 点钟为 0°、顺时针为正」计数，与图表阅读习惯一致。
+ *
+ * @param {number} cx 圆心 x
+ * @param {number} cy 圆心 y
+ * @param {number} radius 所在环的半径
+ * @param {number} angleDeg 以 12 点钟为起点的顺时针角度（度）
+ * @returns {{ x: number, y: number }} SVG 用户坐标系下的点
+ */
 function polarToCartesian(cx, cy, radius, angleDeg) {
   // SVG 默认 0° 在 3 点钟；减 90° 让扇区从 12 点钟顺时针展开
   const rad = ((angleDeg - 90) * Math.PI) / 180
@@ -120,6 +183,20 @@ function polarToCartesian(cx, cy, radius, angleDeg) {
   }
 }
 
+/**
+ * 生成环形扇区（donut slice）的 SVG path d 属性。
+ *
+ * 路径构成：外弧顺时针 → 内弧逆时针回程 → 闭合，
+ * 因此内弧的 sweep 标志为 0（反向），否则填充规则会出现自交的蝴蝶结形状。
+ *
+ * @param {number} cx 圆心 x
+ * @param {number} cy 圆心 y
+ * @param {number} outerR 外半径（高亮态会略放大以形成「弹出」效果）
+ * @param {number} innerR 内半径（甜甜圈孔径）
+ * @param {number} startDeg 起始角度（度，12 点钟为 0°）
+ * @param {number} endDeg 结束角度（度）
+ * @returns {string} 可直接用于 <path d="..."> 的路径字符串
+ */
 function createDonutSlicePath(cx, cy, outerR, innerR, startDeg, endDeg) {
   const startOuter = polarToCartesian(cx, cy, outerR, startDeg)
   const endOuter = polarToCartesian(cx, cy, outerR, endDeg)
@@ -149,19 +226,31 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
   const { t, lang } = useLanguage()
   const GROUP_META = useLocalizedTypeGroupMeta()
   const RESULTS = useLocalizedResults()
+  // 以 code 为键建索引，用于把远端只有 code 的分布行「补回」当前语言的类型标题
   const RESULTS_MAP = useMemo(() => Object.fromEntries(RESULTS.map((r) => [r.code, r])), [RESULTS])
+  // 数字格式化语言：与文案语言保持一致，避免中文界面出现英文分组符号
   const numberLocale = lang === 'en' ? 'en-US' : 'zh-CN'
+
+  // —— 数据状态 ——
+  // statsDataRaw 保留远端原始响应，不改动服务端下发的字段
   const [statsDataRaw, setStatsDataRaw] = useState(null)
+  // requestState 是三态机：'loading' | 'success' | 'error'
   const [requestState, setRequestState] = useState('loading')
   const [statsError, setStatsError] = useState('')
+  // —— 展示状态 ——
+  // metricMode 决定排名列表的排序口径：占比 / 人数
   const [metricMode, setMetricMode] = useState('percent')
+  // activeCode 是甜甜圈与排名列表联动的高亮类型
   const [activeCode, setActiveCode] = useState(null)
+  // retryCount 递增即触发重新拉数（作为 effect 依赖使用）
   const [retryCount, setRetryCount] = useState(0)
 
+  // 三态派生：loading 走骨架，success 且分布非空才算有数据，error 显示重试入口
   const isLoading = requestState === 'loading'
   const hasData = requestState === 'success' && !!statsDataRaw?.typeDistribution?.length
   const isError = requestState === 'error'
 
+  // 拉取匿名汇总：retryCount 变化即重跑；t 变化（切语言）也重跑，以便错误文案跟着换语言
   useEffect(() => {
     let disposed = false
 
@@ -188,19 +277,24 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
     return () => { disposed = true } // retryCount 重跑时丢弃上一轮慢响应，避免写回过期 state
   }, [retryCount, t])
 
-  // 用当前语言改写远端数据中的 title / label / cuteTags / sourceNote / insights
+  // 用当前语言改写远端数据中的 title / label / cuteTags / sourceNote / insights。
+  // 远端只存 code 与中文标注，这里把可本地化的字段逐个覆盖成当前语种，
+  // 且不改动原始 statsDataRaw（便于切回中文时无需重新请求）。
   const statsData = useMemo(() => {
     if (!statsDataRaw) return null
+    // 分布行的 title 一律以本地结果为权威；本地缺该 code 时退回远端自带的 title
     const enrichTitle = (item) => ({
       ...item,
       title: RESULTS_MAP?.[item?.code]?.title ?? item.title,
     })
+    // cuteTags / sourceNote 仅在英文下替换（中文即远端原文）；insights 则按位次重算，见下
     const cuteTagsLocalized = lang === 'en'
       ? [t('stats.cute_tag_today'), t('stats.cute_tag_sample'), t('stats.cute_tag_reference'), t('stats.cute_tag_no_rank')]
       : statsDataRaw.cuteTags
     const localizedInsights = (statsDataRaw.insights || []).map((insight, idx) => {
       if (lang === 'zh') return insight
       // insight 是包含 title / value / note 的对象；按位置覆盖
+      // 英文不翻译中文原文，而是就地重算：0=最高占比，1=最低占比，2=色系说明
       const sorted = [...statsDataRaw.typeDistribution].sort((a, b) => b.percent - a.percent)
       const top = sorted[0]
       const bottom = sorted[sorted.length - 1]
@@ -244,6 +338,8 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
     }
   }, [statsDataRaw, lang, GROUP_META, t, RESULTS_MAP])
 
+  // 类型码 → 颜色。按接口返回顺序依次取色（取模兜底），保证同一份数据下
+  // 甜甜圈、排名列表、Top/Bottom 榜单三处用的是同一个颜色。
   const typeColorMap = useMemo(() => {
     if (!hasData) return {}
     return Object.fromEntries(
@@ -251,6 +347,8 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
     )
   }, [hasData, statsData])
 
+  // 把占比换算成扇区角度：按顺序累加，累计角度即为每个扇区的起止边。
+  // 用累计而非固定步长，是为了让 16 个扇区首尾严格闭合、不留缝隙。
   const donutSlices = useMemo(() => {
     if (!hasData) return []
     let currentAngle = 0
@@ -268,6 +366,8 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
     })
   }, [hasData, statsData, typeColorMap])
 
+  // 当前高亮的类型（同时驱动甜甜圈中心文字与排名列表的选中底色）；
+  // 无数据时返回恒定占位对象，避免渲染分支到处判空。
   const activeType = useMemo(() => {
     if (!hasData) {
       return { code: '--', title: '--', percent: 0, count: 0 }
@@ -275,6 +375,8 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
     return statsData.typeDistribution.find((item) => item.code === activeCode) ?? statsData.typeDistribution[0]
   }, [activeCode, hasData, statsData])
 
+  // 排名列表数据：按左上角开关切换「占比 / 人数」两种排序口径。
+  // 先复制再 sort，防止就地排序污染上游 typeDistribution 的顺序（扇区角度依赖该顺序）。
   const rankedTypes = useMemo(() => {
     if (!hasData) return PLACEHOLDER_RANKED
     const list = [...statsData.typeDistribution]
@@ -295,6 +397,7 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
 
   return (
     <div className="pb-10">
+      {/* 头部：标题 + 累计份数 + 趣味标签；错误态在累计份数下方就地给出重试入口 */}
       <header className="pt-4 pb-8 text-center md:pt-8">
         <p className="text-eyebrow">{t('stats.eyebrow')}</p>
         <h1 className="mt-2 text-2xl md:text-[32px] font-extrabold text-base-text leading-tight">{t('stats.title')}</h1>
@@ -338,6 +441,7 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
         </div>
 
         <div className="mt-5 flex flex-wrap justify-center gap-2">
+          {/* 标签区同样按三态渲染：骨架条 / 远端趣味标签 + 分享提示 / 单个占位「--」 */}
           {isLoading ? (
             Array.from({ length: 5 }, (_, index) => (
               <span
@@ -368,6 +472,7 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
         </div>
       </header>
 
+      {/* 类型分布：甜甜圈（悬停/点击高亮）+ 排名列表；右上开关切换排序口径 */}
       <motion.section {...sectionReveal} className="border-t border-gray-100 pt-6 md:pt-8">
         <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
           <div className="flex items-start gap-3">
@@ -413,6 +518,7 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
                 transition={{ duration: 0.7, ease: 'easeOut' }}
               >
                 <svg viewBox="0 0 240 240" className="h-full w-full">
+                  {/* 每个扇区：高亮态外半径 108（略大于常态 104）形成向外弹出的视觉差 */}
                   {donutSlices.map((slice) => {
                     const isActive = activeType?.code === slice.code
                     const path = createDonutSlicePath(120, 120, isActive ? 108 : 104, 62, slice.startAngle, slice.endAngle)
@@ -433,6 +539,7 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
                     )
                   })}
                 </svg>
+                {/* 甜甜圈中心孔洞：绝对定位于 inset-26% 处，显示当前高亮类型的三行信息 */}
                 <div className="absolute inset-[26%] rounded-full bg-white shadow-inner flex flex-col items-center justify-center text-center px-2">
                   <p className="text-[11px] tracking-wide text-base-mute">{t('stats.chart_active')}</p>
                   <p className="text-sm font-bold text-base-text">{activeType.code}</p>
@@ -449,6 +556,7 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 sm:gap-x-4">
+            {/* 排名列表条目同时是甜甜圈的「遥控器」：悬停或点击都会改写 activeCode */}
             {rankedTypes.map((item, idx) => {
               const rank = idx + 1
               const valueText = metricMode === 'count'
@@ -491,6 +599,7 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
         </div>
       </motion.section>
 
+      {/* 色系占比 + 数据洞察：左栏四条进度条，右栏三条文字洞察 */}
       <motion.section {...sectionReveal} className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-12 border-t border-gray-100 pt-7">
         <div>
           <div className="flex items-start gap-3 mb-5">
@@ -514,6 +623,7 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
                   </span>
                 </div>
                 <div className="h-1.5 rounded-full bg-gray-100/80 overflow-hidden">
+                  {/* 进度条从 0 宽度动画到实际占比；accent 色由远端下发，用 80 后缀叠加半透明光晕 */}
                   <motion.div
                     className="h-full rounded-full"
                     style={{
@@ -539,6 +649,7 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
             </div>
           </div>
           <div className="space-y-5">
+            {/* 洞察条目统一用左侧竖线 + 标题/结论/补充三行结构；首条不画顶部分隔线 */}
             {(hasData ? statsData.insights : PLACEHOLDER_INSIGHTS).map((insight, idx) => (
               <article
                 key={insight.title === '--' ? insight.key : insight.title}
@@ -561,6 +672,7 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
         </div>
       </motion.section>
 
+      {/* 两端榜单：左绿为占比最高的 Top3，右橙为占比最低的 Bottom3，配色作语义区分 */}
       <motion.section {...sectionReveal} className="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-12 border-t border-gray-100 pt-7">
         <div className="relative pl-4">
           <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-full bg-emerald-500/70" aria-hidden />
@@ -609,6 +721,7 @@ export default function StatsPage({ onStartTest, onGoTypes }) {
         </div>
       </motion.section>
 
+      {/* 页脚：引导用户去做测试或浏览 16 型详情 */}
       <footer className="mt-12 pt-8 border-t border-gray-100 text-center">
         <p className="mb-5 text-sm text-base-mute">
           {t('stats.footer_text')}
